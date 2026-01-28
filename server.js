@@ -283,6 +283,7 @@ app.delete('/api/leads/:id', (req, res) => {
 app.post('/api/leads/upload', upload.single('file'), (req, res) => {
   try {
     if (!req.file) {
+      console.log('❌ No file received');
       return res.status(400).json({ success: false, inserted: 0, failed: 0, error: 'No file uploaded' });
     }
 
@@ -290,77 +291,169 @@ app.post('/api/leads/upload', upload.single('file'), (req, res) => {
     const buffer = req.file.buffer;
     let rows = [];
 
+    console.log('\n📁 UPLOAD START:', fileName);
+
     // Parse file
     if (fileName.endsWith('.csv')) {
       const csv = buffer.toString('utf-8');
       rows = parse(csv, { columns: true, skip_empty_lines: true });
+      console.log('✅ CSV Parsed:', rows.length, 'rows');
     } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       const workbook = XLSX.read(buffer, { type: 'buffer' });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       rows = XLSX.utils.sheet_to_json(sheet);
+      console.log('✅ Excel Parsed:', rows.length, 'rows');
     } else {
-      return res.status(400).json({ success: false, inserted: 0, failed: 0, error: 'Invalid file format' });
+      console.log('❌ Invalid format:', fileName);
+      return res.status(400).json({ success: false, inserted: 0, failed: 0, error: 'Invalid file format. Use CSV or Excel.' });
     }
 
     if (!rows || rows.length === 0) {
-      return res.status(400).json({ success: false, inserted: 0, failed: 0, error: 'No data in file' });
+      console.log('❌ No rows found');
+      return res.status(400).json({ success: false, inserted: 0, failed: 0, error: 'No data found in file' });
     }
 
-    // Auto-detect columns
+    console.log('📊 Column headers:', Object.keys(rows[0]));
+
+    // Auto-detect columns - IMPROVED for your format
     const detectColumn = (name) => {
-      const n = name.toLowerCase();
+      if (!name) return null;
+      const n = name.toLowerCase().trim();
+      
+      // Exact matches first
+      if (n === 'first name' || n === 'firstname' || n === 'first_name') return 'firstName';
+      if (n === 'last name' || n === 'lastname' || n === 'last_name') return 'lastName';
+      if (n === 'email' || n === 'email address') return 'email';
+      if (n === 'phone' || n === 'phone number' || n === 'cell' || n === 'mobile') return 'phone';
+      if (n === 'property address' || n === 'address' || n === 'property') return 'propertyAddress';
+      if (n === 'property price' || n === 'price') return 'propertyPrice';
+      if (n === 'property type' || n === 'type') return 'propertyType';
+      
+      // Fuzzy matches
       if (n.includes('first')) return 'firstName';
       if (n.includes('last')) return 'lastName';
       if (n.includes('email')) return 'email';
-      if (n.includes('phone')) return 'phone';
-      if (n.includes('address') || n.includes('property')) return 'propertyAddress';
-      if (n.includes('price')) return 'propertyPrice';
-      if (n.includes('type')) return 'propertyType';
+      if (n.includes('phone') || n.includes('cell') || n.includes('mobile')) return 'phone';
+      if ((n.includes('property') || n.includes('address')) && n.includes('address')) return 'propertyAddress';
+      if ((n.includes('property') || n.includes('price')) && n.includes('price')) return 'propertyPrice';
+      if ((n.includes('property') || n.includes('type')) && n.includes('type')) return 'propertyType';
+      
       return null;
     };
 
     const colMap = {};
     Object.keys(rows[0]).forEach(col => {
       const mapped = detectColumn(col);
-      if (mapped) colMap[col] = mapped;
+      if (mapped) {
+        colMap[col] = mapped;
+        console.log(`  ✓ "${col}" → ${mapped}`);
+      }
     });
 
-    let inserted = 0, failed = 0;
+    // Check if email column found
+    const hasEmail = Object.values(colMap).includes('email');
+    if (!hasEmail) {
+      console.log('❌ Email column not found!');
+      console.log('   Available columns:', Object.keys(rows[0]));
+      return res.status(400).json({
+        success: false,
+        inserted: 0,
+        failed: 0,
+        error: 'Email column not found. Check your CSV headers: ' + Object.keys(rows[0]).join(', ')
+      });
+    }
 
-    // Insert leads
-    rows.forEach((row) => {
-      const lead = {};
+    let inserted = 0, failed = 0, processed = 0;
+
+    console.log('\n📝 Processing rows...');
+
+    // Insert leads with proper callback tracking
+    rows.forEach((row, idx) => {
+      const lead = {
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        propertyAddress: '',
+        propertyPrice: '',
+        propertyType: ''
+      };
+
+      // Map values
       Object.keys(colMap).forEach(col => {
-        lead[colMap[col]] = (row[col] || '').toString().trim();
+        const value = (row[col] || '').toString().trim();
+        lead[colMap[col]] = value;
       });
 
-      if (!lead.email) {
+      // Skip if no email
+      if (!lead.email || lead.email === '') {
+        console.log(`  Row ${idx + 1}: ❌ Missing email`);
         failed++;
+        processed++;
+        
+        if (processed === rows.length) {
+          finishUpload();
+        }
         return;
       }
 
+      console.log(`  Row ${idx + 1}: ${lead.firstName || '?'} ${lead.lastName || '?'} <${lead.email}>`);
+
+      // Insert with OR IGNORE for duplicates
       db.run(
-        `INSERT INTO leads (firstName, lastName, email, phone, propertyAddress, propertyPrice, propertyType)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [lead.firstName || '', lead.lastName || '', lead.email, lead.phone || '', lead.propertyAddress || '', lead.propertyPrice || '', lead.propertyType || ''],
-        (err) => {
+        `INSERT OR IGNORE INTO leads 
+         (firstName, lastName, email, phone, propertyAddress, propertyPrice, propertyType, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [
+          lead.firstName,
+          lead.lastName,
+          lead.email,
+          lead.phone,
+          lead.propertyAddress,
+          lead.propertyPrice,
+          lead.propertyType
+        ],
+        function(err) {
           if (err) {
+            console.log(`    ❌ Database error: ${err.message}`);
             failed++;
-          } else {
+          } else if (this.changes > 0) {
+            console.log(`    ✅ Inserted`);
             inserted++;
+          } else {
+            console.log(`    ⊘ Duplicate (skipped)`);
+            failed++;
+          }
+
+          processed++;
+
+          // When all rows processed, send response
+          if (processed === rows.length) {
+            finishUpload();
           }
         }
       );
     });
 
-    // Send response after short delay
-    setTimeout(() => {
-      res.json({ success: true, inserted, failed, total: rows.length, message: `Uploaded: ${inserted} success, ${failed} failed` });
-    }, 300);
+    function finishUpload() {
+      console.log(`\n✅ UPLOAD COMPLETE: ${inserted} inserted, ${failed} failed`);
+      res.json({
+        success: true,
+        inserted,
+        failed,
+        total: rows.length,
+        message: `✓ Upload complete! ${inserted} added.`
+      });
+    }
 
   } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ success: false, inserted: 0, failed: 0, error: error.message });
+    console.error('❌ Upload error:', error.message);
+    res.status(500).json({
+      success: false,
+      inserted: 0,
+      failed: 0,
+      error: 'Error: ' + error.message
+    });
   }
 });
 
