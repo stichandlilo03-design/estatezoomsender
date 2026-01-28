@@ -3,20 +3,20 @@ const nodemailer = require('nodemailer');
 const multer = require('multer');
 const { parse } = require('csv-parse/sync');
 const XLSX = require('xlsx');
-const path = require('path');
 
 const app = express();
 
-// Middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb' }));
 app.use(express.static('public'));
 
-// In-memory storage (Vercel doesn't allow file writes)
+// IN-MEMORY DATA STORES
 let leads = [];
 let templates = [
-  { id: 1, name: 'Default', subject: 'Hello {{firstName}}', html: '<h1>Hello {{firstName}}</h1><p>Property: {{propertyAddress}}</p>' }
+  { id: 1, name: 'Default Property', subject: 'Great News About {{propertyAddress}}', html: '<h1>Hello {{firstName}}!</h1><p>Property: {{propertyAddress}}</p><p>Price: {{propertyPrice}}</p><p><a href="{{zoomLink}}">Join Zoom</a></p>' }
 ];
+let campaigns = [];
+let sendingLogs = [];
 let smtpSettings = {
   host: 'smtp.gmail.com',
   port: 587,
@@ -30,6 +30,7 @@ let smtpSettings = {
 
 let nextLeadId = 1;
 let nextTemplateId = 2;
+let nextCampaignId = 1;
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -43,14 +44,8 @@ app.post('/api/leads', (req, res) => {
   try {
     const { firstName, lastName, email, phone, propertyAddress, propertyPrice, propertyType } = req.body;
     
-    if (!email) {
-      return res.json({ success: false, error: 'Email required' });
-    }
-
-    // Check if email already exists
-    if (leads.some(l => l.email === email)) {
-      return res.json({ success: false, error: 'Email already exists' });
-    }
+    if (!email) return res.json({ success: false, error: 'Email required' });
+    if (leads.some(l => l.email === email)) return res.json({ success: false, error: 'Email exists' });
 
     leads.push({
       id: nextLeadId++,
@@ -75,33 +70,46 @@ app.delete('/api/leads/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// ==================== CLEAR ALL ====================
+
+app.post('/api/clear-all', (req, res) => {
+  try {
+    leads = [];
+    templates = [
+      { id: 1, name: 'Default Property', subject: 'Great News About {{propertyAddress}}', html: '<h1>Hello {{firstName}}!</h1><p>Property: {{propertyAddress}}</p>' }
+    ];
+    campaigns = [];
+    sendingLogs = [];
+    nextLeadId = 1;
+    nextTemplateId = 2;
+    nextCampaignId = 1;
+    
+    res.json({ success: true, message: 'All data cleared' });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
 // ==================== UPLOAD ====================
 
 app.post('/api/leads/upload', upload.single('file'), (req, res) => {
   try {
-    if (!req.file) {
-      return res.json({ success: false, inserted: 0, failed: 0 });
-    }
+    if (!req.file) return res.json({ success: false, inserted: 0, failed: 0 });
 
     const fileName = req.file.originalname.toLowerCase();
     let rows = [];
 
-    // Parse CSV or Excel
     if (fileName.endsWith('.csv')) {
       rows = parse(req.file.buffer.toString('utf-8'), { columns: true, skip_empty_lines: true });
     } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      rows = XLSX.utils.sheet_to_json(sheet);
+      rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
     } else {
       return res.json({ success: false, inserted: 0, failed: 0 });
     }
 
-    if (!rows || rows.length === 0) {
-      return res.json({ success: false, inserted: 0, failed: 0 });
-    }
+    if (!rows || rows.length === 0) return res.json({ success: false, inserted: 0, failed: 0 });
 
-    // Auto-map columns
     const mapCol = (name) => {
       const n = (name || '').toLowerCase().trim();
       if (n.includes('first')) return 'firstName';
@@ -135,13 +143,7 @@ app.post('/api/leads/upload', upload.single('file'), (req, res) => {
           lead[colMap[col]] = (row[col] || '').toString().trim();
         });
 
-        if (!lead.email) {
-          failed++;
-          continue;
-        }
-
-        // Check if email exists
-        if (leads.some(l => l.email === lead.email)) {
+        if (!lead.email || leads.some(l => l.email === lead.email)) {
           failed++;
           continue;
         }
@@ -166,7 +168,7 @@ app.post('/api/leads/upload', upload.single('file'), (req, res) => {
 
     res.json({ success: true, inserted, failed });
   } catch (error) {
-    res.json({ success: false, inserted: 0, failed: 0, error: error.message });
+    res.json({ success: false, inserted: 0, failed: 0 });
   }
 });
 
@@ -184,28 +186,18 @@ app.get('/api/templates/:id', (req, res) => {
 app.post('/api/templates', (req, res) => {
   try {
     const { id, name, subject, html } = req.body;
-
-    if (!name || !subject || !html) {
-      return res.json({ success: false });
-    }
+    if (!name || !subject || !html) return res.json({ success: false });
 
     if (id) {
       const idx = templates.findIndex(t => t.id === id);
-      if (idx >= 0) {
-        templates[idx] = { id, name, subject, html };
-      }
+      if (idx >= 0) templates[idx] = { id, name, subject, html };
     } else {
-      templates.push({
-        id: nextTemplateId++,
-        name,
-        subject,
-        html
-      });
+      templates.push({ id: nextTemplateId++, name, subject, html });
     }
 
     res.json({ success: true });
   } catch (err) {
-    res.json({ success: false, error: err.message });
+    res.json({ success: false });
   }
 });
 
@@ -232,7 +224,7 @@ app.post('/api/smtp-settings', (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    res.json({ success: false, error: err.message });
+    res.json({ success: false });
   }
 });
 
@@ -248,10 +240,7 @@ app.post('/api/smtp-test', async (req, res) => {
       host: smtpSettings.host,
       port: smtpSettings.port,
       secure: smtpSettings.secure,
-      auth: {
-        user: smtpSettings.user,
-        pass: smtpSettings.pass
-      }
+      auth: { user: smtpSettings.user, pass: smtpSettings.pass }
     });
 
     const verified = await transporter.verify();
@@ -265,35 +254,26 @@ app.post('/api/smtp-test', async (req, res) => {
   }
 });
 
-// ==================== SEND TEST EMAIL ====================
+// ==================== TEST EMAIL ====================
 
 app.post('/api/smtp-test-email', async (req, res) => {
   try {
     const { email } = req.body;
-
-    if (!email) {
-      return res.json({ success: false, error: 'Email required' });
-    }
-
-    if (!smtpSettings.user || !smtpSettings.pass) {
-      return res.json({ success: false, error: 'SMTP not configured' });
-    }
+    if (!email) return res.json({ success: false, error: 'Email required' });
+    if (!smtpSettings.user || !smtpSettings.pass) return res.json({ success: false, error: 'SMTP not configured' });
 
     const transporter = nodemailer.createTransport({
       host: smtpSettings.host,
       port: smtpSettings.port,
       secure: smtpSettings.secure,
-      auth: {
-        user: smtpSettings.user,
-        pass: smtpSettings.pass
-      }
+      auth: { user: smtpSettings.user, pass: smtpSettings.pass }
     });
 
     await transporter.sendMail({
       from: smtpSettings.user,
       to: email,
       subject: 'Test Email - Campaign Manager',
-      html: '<h1>✓ Success!</h1><p>Your SMTP is configured correctly!</p>'
+      html: '<h1>✓ Success!</h1><p>Your SMTP is working correctly!</p>'
     });
 
     res.json({ success: true, message: 'Email sent to ' + email });
@@ -302,42 +282,47 @@ app.post('/api/smtp-test-email', async (req, res) => {
   }
 });
 
-// ==================== SEND CAMPAIGN ====================
+// ==================== CAMPAIGNS & SENDING LOGS ====================
+
+app.get('/api/campaigns', (req, res) => {
+  res.json(campaigns);
+});
+
+app.get('/api/campaigns/logs', (req, res) => {
+  res.json(sendingLogs);
+});
 
 app.post('/api/campaigns/send', async (req, res) => {
   try {
     const { templateId, zoomLink, meetingDate, meetingTime } = req.body;
 
     const template = templates.find(t => t.id === parseInt(templateId));
-    if (!template) {
-      return res.json({ success: false, error: 'Template not found' });
-    }
+    if (!template) return res.json({ success: false, error: 'Template not found' });
+    if (leads.length === 0) return res.json({ success: false, error: 'No leads' });
+    if (!smtpSettings.user || !smtpSettings.pass) return res.json({ success: false, error: 'SMTP not configured' });
 
-    if (leads.length === 0) {
-      return res.json({ success: false, error: 'No leads' });
-    }
-
-    if (!smtpSettings.user || !smtpSettings.pass) {
-      return res.json({ success: false, error: 'SMTP not configured' });
-    }
+    const campaignId = nextCampaignId++;
+    const campaign = {
+      id: campaignId,
+      name: 'Campaign ' + campaignId,
+      templateId,
+      leadsCount: leads.length,
+      sentAt: new Date().toISOString(),
+      status: 'sending'
+    };
+    campaigns.push(campaign);
 
     const transporter = nodemailer.createTransport({
       host: smtpSettings.host,
       port: smtpSettings.port,
       secure: smtpSettings.secure,
-      auth: {
-        user: smtpSettings.user,
-        pass: smtpSettings.pass
-      }
+      auth: { user: smtpSettings.user, pass: smtpSettings.pass }
     });
 
     let sent = 0;
     let failed = 0;
 
-    // Send to first 10 leads (Vercel timeout limit)
-    const leadsToSend = leads.slice(0, 10);
-
-    for (const lead of leadsToSend) {
+    for (const lead of leads) {
       try {
         let html = template.html;
         html = html.replace(/{{firstName}}/g, lead.firstName || '');
@@ -350,6 +335,7 @@ app.post('/api/campaigns/send', async (req, res) => {
         html = html.replace(/{{zoomLink}}/g, zoomLink || '');
         html = html.replace(/{{meetingDate}}/g, meetingDate || '');
         html = html.replace(/{{meetingTime}}/g, meetingTime || '');
+        html = html.replace(/{{companyName}}/g, smtpSettings.company || '');
 
         let subject = template.subject;
         subject = subject.replace(/{{firstName}}/g, lead.firstName || '');
@@ -363,30 +349,45 @@ app.post('/api/campaigns/send', async (req, res) => {
         });
 
         sent++;
+
+        sendingLogs.push({
+          campaignId,
+          leadId: lead.id,
+          leadEmail: lead.email,
+          leadName: lead.firstName + ' ' + lead.lastName,
+          status: 'success',
+          message: 'Sent successfully',
+          timestamp: new Date().toISOString()
+        });
       } catch (e) {
         failed++;
+
+        sendingLogs.push({
+          campaignId,
+          leadId: lead.id,
+          leadEmail: lead.email,
+          leadName: lead.firstName + ' ' + lead.lastName,
+          status: 'failed',
+          message: e.message,
+          timestamp: new Date().toISOString()
+        });
       }
     }
 
-    res.json({ 
-      success: true, 
-      sent, 
-      failed, 
-      total: leadsToSend.length,
-      message: `Sent to ${sent} leads` 
-    });
+    campaign.status = 'completed';
+    campaign.sent = sent;
+    campaign.failed = failed;
+
+    res.json({ success: true, sent, failed, total: leads.length });
   } catch (error) {
     res.json({ success: false, error: error.message });
   }
 });
 
-// Export for Vercel
+// Export
 module.exports = app;
 
-// For local testing
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-    console.log(`✅ Server running on port ${PORT}`);
-  });
+  app.listen(PORT, () => console.log(`✅ Server on port ${PORT}`));
 }
