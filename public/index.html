@@ -48,7 +48,7 @@
         .stat { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 8px; text-align: center; }
         .stat-num { font-size: 24px; font-weight: bold; }
         .stat-label { font-size: 12px; margin-top: 5px; opacity: 0.9; }
-        textarea { min-height: 100px; resize: vertical; }
+        textarea { min-height: 100px; resize: vertical; font-family: 'Courier New', monospace; }
         .overflow-x { overflow-x: auto; }
         .log-item { padding: 10px; border-left: 4px solid #667eea; background: #f8f9ff; margin-bottom: 8px; border-radius: 4px; font-size: 13px; }
         .log-success { border-left-color: #28a745; background: #ecfdf5; }
@@ -58,13 +58,19 @@
         .modal-content { background: white; border-radius: 10px; padding: 25px; max-width: 600px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .modal-close { background: none; border: none; font-size: 28px; cursor: pointer; color: #999; padding: 0; width: auto; box-shadow: none; }
+        .tabs-inner { display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid #ddd; }
+        .tab-inner { padding: 8px 15px; background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; color: #666; font-weight: 600; font-size: 13px; }
+        .tab-inner:hover { color: #667eea; }
+        .tab-inner.active { color: #667eea; border-bottom-color: #667eea; }
+        .tab-inner-content { display: none; }
+        .tab-inner-content.active { display: block; }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>📧 Email Campaign Manager - ULTIMATE</h1>
-            <p class="subtitle">Send campaigns • Track logs • Preview leads • All features</p>
+            <p class="subtitle">✓ Paste data • ✓ Upload CSV • ✓ Send campaigns • ✓ Track logs</p>
             <div class="tabs">
                 <button class="tab-btn active" onclick="switchTab('dashboard')">📊 Dashboard</button>
                 <button class="tab-btn" onclick="switchTab('leads')">👥 Leads</button>
@@ -80,12 +86,12 @@
             <div class="stats">
                 <div class="stat"><div class="stat-num" id="dashLeads">0</div><div class="stat-label">Leads</div></div>
                 <div class="stat"><div class="stat-num" id="dashTemplates">0</div><div class="stat-label">Templates</div></div>
-                <div class="stat"><div class="stat-num" id="dashCampaigns">0</div><div class="stat-label">Sent</div></div>
+                <div class="stat"><div class="stat-num" id="dashCampaigns">0</div><div class="stat-label">Campaigns</div></div>
                 <div class="stat"><div class="stat-num" id="dashLogs">0</div><div class="stat-label">Emails</div></div>
             </div>
             <div class="card">
                 <h2>Quick Start</h2>
-                <p style="color: #666; line-height: 1.6;">✓ Add leads or import CSV • ✓ Create templates • ✓ Configure SMTP • ✓ Send campaigns • ✓ View logs</p>
+                <p style="color: #666; line-height: 1.6;">✓ Paste or upload leads • ✓ Create templates • ✓ Configure SMTP • ✓ Send campaigns • ✓ View logs</p>
             </div>
         </div>
 
@@ -108,14 +114,34 @@
                 </div>
 
                 <div class="card">
-                    <h2>📤 Upload CSV</h2>
+                    <h2>📤 Import Leads</h2>
                     <div id="uploadMsg" class="msg"></div>
-                    <div class="file-upload" onclick="document.getElementById('file').click()">
-                        <input type="file" id="file" accept=".csv,.xlsx,.xls" onchange="uploadFile(event)">
-                        <p style="color: #667eea; font-weight: 600;">📁 Click to upload</p>
+                    <div class="tabs-inner">
+                        <button class="tab-inner active" onclick="switchImportTab('paste')">Paste</button>
+                        <button class="tab-inner" onclick="switchImportTab('upload')">Upload</button>
                     </div>
-                    <div class="loading" id="uploadLoading">⏳ Processing...</div>
-                    <div id="uploadStats" style="display: none; margin-top: 10px;">
+                    
+                    <!-- PASTE -->
+                    <div id="paste" class="tab-inner-content active">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>Paste CSV data (with headers):</label>
+                            <textarea id="pasteArea" placeholder="First Name,Last Name,Email,Phone,Address,Price,Type
+John,Smith,john@example.com,+1-704-555-0101,123 Main St,$450000,House
+Jane,Doe,jane@example.com,+1-704-555-0102,456 Oak Ave,$550000,Condo"></textarea>
+                            <button type="button" class="btn-success" onclick="pasteLead()" style="width: 100%; margin-top: 10px;">Paste & Import</button>
+                        </div>
+                    </div>
+
+                    <!-- UPLOAD -->
+                    <div id="upload" class="tab-inner-content">
+                        <div class="file-upload" onclick="document.getElementById('file').click()">
+                            <input type="file" id="file" accept=".csv,.xlsx,.xls" onchange="uploadFile(event)">
+                            <p style="color: #667eea; font-weight: 600;">📁 Click to upload CSV/Excel</p>
+                        </div>
+                    </div>
+
+                    <div class="loading" id="importLoading">⏳ Processing...</div>
+                    <div id="importStats" style="display: none; margin-top: 10px;">
                         <div style="padding: 10px; background: #d4edda; border-radius: 6px; margin-bottom: 8px; color: #155724; font-size: 13px;">✓ Added: <strong id="addedCount">0</strong></div>
                         <div style="padding: 10px; background: #fff3cd; border-radius: 6px; color: #856404; font-size: 13px;">⚠ Failed: <strong id="failedCount">0</strong></div>
                     </div>
@@ -264,6 +290,13 @@
             if (tab === 'dashboard') loadDash();
         }
 
+        function switchImportTab(tab) {
+            document.querySelectorAll('.tab-inner-content').forEach(e => e.classList.remove('active'));
+            document.querySelectorAll('.tab-inner').forEach(e => e.classList.remove('active'));
+            document.getElementById(tab).classList.add('active');
+            event.target.classList.add('active');
+        }
+
         function showMsg(id, text, type) {
             const el = document.getElementById(id);
             el.textContent = text;
@@ -322,18 +355,34 @@
             if (r.success) { document.getElementById('addForm').reset(); showMsg('addMsg', '✓ Added!', 'success'); loadLeads(); } else showMsg('addMsg', '✗ ' + r.error, 'error');
         }
 
+        async function pasteLead() {
+            const text = document.getElementById('pasteArea').value;
+            if (!text) { showMsg('uploadMsg', '⚠ Paste data first', 'warning'); return; }
+            
+            document.getElementById('importLoading').style.display = 'block';
+            const r = await fetch(`${API}/leads/paste`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) }).then(r => r.json()).catch(() => ({ inserted: 0, failed: 0 }));
+            
+            document.getElementById('addedCount').textContent = r.inserted || 0;
+            document.getElementById('failedCount').textContent = r.failed || 0;
+            document.getElementById('importStats').style.display = 'block';
+            showMsg('uploadMsg', `✓ ${r.inserted || 0} added!`, 'success');
+            document.getElementById('importLoading').style.display = 'none';
+            document.getElementById('pasteArea').value = '';
+            loadLeads();
+        }
+
         async function uploadFile(e) {
             const file = e.target.files[0];
             if (!file) return;
-            document.getElementById('uploadLoading').style.display = 'block';
+            document.getElementById('importLoading').style.display = 'block';
             const fd = new FormData();
             fd.append('file', file);
             const r = await fetch(`${API}/leads/upload`, { method: 'POST', body: fd }).then(r => r.json()).catch(() => ({ inserted: 0, failed: 0 }));
             document.getElementById('addedCount').textContent = r.inserted || 0;
             document.getElementById('failedCount').textContent = r.failed || 0;
-            document.getElementById('uploadStats').style.display = 'block';
+            document.getElementById('importStats').style.display = 'block';
             showMsg('uploadMsg', `✓ ${r.inserted || 0} added!`, 'success');
-            document.getElementById('uploadLoading').style.display = 'none';
+            document.getElementById('importLoading').style.display = 'none';
             loadLeads();
         }
 
@@ -373,15 +422,9 @@
 
         async function sendCampaign(e) { e.preventDefault(); const tid = document.getElementById('ctemplate').value; if (!tid) { showMsg('campaignMsg', '⚠ Select template', 'warning'); return; } document.getElementById('campaignLoading').style.display = 'block'; const r = await fetch(`${API}/campaigns/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ templateId: parseInt(tid), zoomLink: document.getElementById('czoom').value, meetingDate: document.getElementById('cdate').value, meetingTime: document.getElementById('ctime').value }) }).then(r => r.json()); document.getElementById('campaignLoading').style.display = 'none'; if (r.success) { showMsg('campaignMsg', `✓ Sent: ${r.sent} success, ${r.failed} failed!`, 'success'); document.getElementById('campaignForm').reset(); document.getElementById('campaignStatus').textContent = `Last: ${r.sent} success, ${r.failed} failed`; loadLogs(); } else showMsg('campaignMsg', '✗ ' + r.error, 'error'); }
 
-        async function loadLogs() {
-            logs = await fetch(`${API}/campaigns/logs`).then(r => r.json()).catch(() => []);
-            const html = logs.length ? logs.map(l => `<div class="log-item log-${l.status}"><strong>${l.leadName}</strong> (${l.leadEmail})<br><small>${l.message} - ${new Date(l.timestamp).toLocaleString()}</small></div>`).join('') : '<div style="text-align: center; color: #999; padding: 40px;">No logs yet</div>';
-            document.getElementById('logsList').innerHTML = html;
-        }
+        async function loadLogs() { logs = await fetch(`${API}/campaigns/logs`).then(r => r.json()).catch(() => []); const html = logs.length ? logs.map(l => `<div class="log-item log-${l.status}"><strong>${l.leadName}</strong> (${l.leadEmail})<br><small>${l.message} - ${new Date(l.timestamp).toLocaleString()}</small></div>`).join('') : '<div style="text-align: center; color: #999; padding: 40px;">No logs yet</div>'; document.getElementById('logsList').innerHTML = html; }
 
-        function clearLogs() {
-            if (confirm('Clear all logs?')) { logs = []; document.getElementById('logsList').innerHTML = '<div style="text-align: center; color: #999; padding: 40px;">Logs cleared</div>'; }
-        }
+        function clearLogs() { if (confirm('Clear all logs?')) { logs = []; document.getElementById('logsList').innerHTML = '<div style="text-align: center; color: #999; padding: 40px;">Logs cleared</div>'; } }
 
         async function loadSmtp() { const s = await fetch(`${API}/smtp-settings`).then(r => r.json()).catch(() => ({})); document.getElementById('shost').value = s.host || ''; document.getElementById('sport').value = s.port || 587; document.getElementById('ssecure').value = (s.secure ? 'true' : 'false'); document.getElementById('suser').value = s.user || ''; document.getElementById('scompany').value = s.company || ''; }
 
