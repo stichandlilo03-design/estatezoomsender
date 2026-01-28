@@ -226,9 +226,12 @@
     </div>
 
     <script>
-        const API_BASE = '/api';
+        // ==================== CONFIG ====================
+        const API_BASE = '/api'; // Use relative path - works on all domains!
         let allLeads = [];
+        let currentPage = 1;
 
+        // ==================== UTILITIES ====================
         function switchTab(e, tab) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
@@ -251,42 +254,67 @@
             }
         }
 
+        // ==================== DASHBOARD ====================
         async function loadDashboard() {
             try {
                 const stats = await fetch(`${API_BASE}/campaigns/stats`).then(r => r.json());
                 document.getElementById('emailsSent').textContent = stats.emailsSent || 0;
                 document.getElementById('emailsOpened').textContent = stats.emailsOpened || 0;
                 document.getElementById('emailsClicked').textContent = stats.emailsClicked || 0;
+
                 const leads = await fetch(`${API_BASE}/leads`).then(r => r.json());
                 document.getElementById('totalLeads').textContent = leads.length || 0;
+
                 const campaigns = await fetch(`${API_BASE}/campaigns`).then(r => r.json());
                 const table = document.getElementById('campaignsTable');
-                table.innerHTML = campaigns.length ? campaigns.slice(0, 10).map(c => `<tr><td>${c.firstName || '?'} ${c.lastName || '?'}</td><td>${c.email}</td><td>${c.campaignName || 'N/A'}</td><td>✓ Sent</td><td>${new Date(c.createdAt).toLocaleDateString()}</td></tr>`).join('') : '<tr><td colspan="5">No campaigns</td></tr>';
-            } catch (e) { console.error(e); }
+                table.innerHTML = campaigns.length ? campaigns.slice(0, 10).map(c => `
+                    <tr>
+                        <td>${c.firstName || '?'} ${c.lastName || '?'}</td>
+                        <td>${c.email}</td>
+                        <td>${c.campaignName || 'N/A'}</td>
+                        <td>✓ Sent</td>
+                        <td>${new Date(c.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                `).join('') : '<tr><td colspan="5">No campaigns</td></tr>';
+            } catch (e) {
+                console.error('Dashboard error:', e);
+            }
         }
 
+        // ==================== LEADS ====================
         async function loadLeads() {
             try {
                 allLeads = await fetch(`${API_BASE}/leads`).then(r => r.json());
                 renderLeads();
-            } catch (e) { console.error(e); }
+            } catch (e) {
+                console.error('Load leads error:', e);
+            }
         }
 
         function renderLeads() {
             const table = document.getElementById('leadsTable');
             if (!allLeads || allLeads.length === 0) {
-                table.innerHTML = '<tr><td colspan="5">No leads</td></tr>';
+                table.innerHTML = '<tr><td colspan="5" style="text-align: center;">No leads</td></tr>';
                 return;
             }
-            table.innerHTML = allLeads.map(lead => `<tr><td>${lead.firstName || ''} ${lead.lastName || ''}</td><td>${lead.email}</td><td>${lead.phone || '-'}</td><td>${lead.propertyAddress || '-'}</td><td><button class="btn-danger" onclick="deleteLead(${lead.id})">🗑️</button></td></tr>`).join('');
+            table.innerHTML = allLeads.map(lead => `
+                <tr>
+                    <td>${lead.firstName || ''} ${lead.lastName || ''}</td>
+                    <td>${lead.email}</td>
+                    <td>${lead.phone || '-'}</td>
+                    <td>${lead.propertyAddress || '-'}</td>
+                    <td><button class="btn-danger" onclick="deleteLead(${lead.id})">🗑️</button></td>
+                </tr>
+            `).join('');
         }
 
         async function deleteLead(id) {
-            if (!confirm('Delete?')) return;
+            if (!confirm('Delete this lead?')) return;
             await fetch(`${API_BASE}/leads/${id}`, { method: 'DELETE' });
             loadLeads();
         }
 
+        // ==================== ADD LEAD ====================
         document.getElementById('addLeadForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
             const res = await fetch(`${API_BASE}/leads`, {
@@ -312,34 +340,56 @@
             }
         });
 
+        // ==================== FILE UPLOAD - FIXED ====================
         document.getElementById('fileInput')?.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
+
+            console.log('📁 File selected:', file.name);
             document.getElementById('uploadLoading').style.display = 'block';
+            document.getElementById('uploadMessage').textContent = '';
+
             try {
                 const formData = new FormData();
                 formData.append('file', file);
+
+                console.log('📤 Uploading to', API_BASE + '/leads/upload');
+
                 const res = await fetch(`${API_BASE}/leads/upload`, {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    timeout: 30000 // 30 second timeout
                 });
+
+                console.log('✅ Response received:', res.status);
+
                 const data = await res.json();
+                console.log('📊 Data:', data);
+
                 document.getElementById('insertedCount').textContent = data.inserted || 0;
                 document.getElementById('failedCount').textContent = data.failed || 0;
                 document.getElementById('uploadStats').style.display = 'block';
+
                 showMsg('uploadMessage', `✓ Upload complete! ${data.inserted} added.`, data.inserted > 0 ? 'success' : 'error');
                 loadLeads();
+
             } catch (err) {
+                console.error('❌ Upload error:', err);
                 showMsg('uploadMessage', '✗ Error: ' + err.message, 'error');
             } finally {
                 document.getElementById('uploadLoading').style.display = 'none';
             }
         });
 
+        // ==================== TEMPLATES ====================
         async function loadTemplates() {
             const res = await fetch(`${API_BASE}/templates`);
             const templates = await res.json();
-            document.getElementById('templatesList').innerHTML = templates.map(t => `<div style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 10px; cursor: pointer;" onclick="editTemplate(${t.id})"><strong>${t.name}</strong><br><small>${t.subject.substring(0, 50)}...</small></div>`).join('');
+            document.getElementById('templatesList').innerHTML = templates.map(t => `
+                <div style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 10px; cursor: pointer;" onclick="editTemplate(${t.id})">
+                    <strong>${t.name}</strong><br><small>${t.subject.substring(0, 50)}...</small>
+                </div>
+            `).join('');
             document.getElementById('selectedTemplate').innerHTML = templates.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
         }
 
@@ -389,9 +439,12 @@
             }
         });
 
+        // ==================== CAMPAIGNS ====================
         document.getElementById('campaignForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const leads = allLeads.map(l => l.id);
             document.getElementById('campaignLoading').style.display = 'block';
+
             setTimeout(() => {
                 document.getElementById('campaignLoading').style.display = 'none';
                 showMsg('campaignMessage', '✓ Campaign sent!', 'success');
@@ -399,6 +452,7 @@
             }, 2000);
         });
 
+        // ==================== SETTINGS ====================
         async function loadSettings() {
             const res = await fetch(`${API_BASE}/smtp-settings`);
             const s = await res.json();
@@ -414,6 +468,7 @@
         document.getElementById('settingsForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
             document.getElementById('settingsLoading').style.display = 'block';
+
             const res = await fetch(`${API_BASE}/smtp-settings`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -428,8 +483,9 @@
                     companyPhone: document.getElementById('companyPhone').value
                 })
             });
+
             const data = await res.json();
-            showMsg('settingsMessage', data.success ? '✓ Settings saved!' : '✗ Error', data.success ? 'success' : 'error');
+            showMsg('settingsMessage', data.success ? '✓ Settings saved!' : '✗ Error: ' + data.message, data.success ? 'success' : 'error');
             document.getElementById('settingsLoading').style.display = 'none';
         });
 
@@ -447,12 +503,12 @@
                 })
             });
             const data = await res.json();
-            showMsg('settingsMessage', data.success ? '✓ Test passed!' : '✗ Failed', data.success ? 'success' : 'error');
+            showMsg('settingsMessage', data.success ? '✓ Connection test passed!' : '✗ Connection failed', data.success ? 'success' : 'error');
             document.getElementById('settingsLoading').style.display = 'none';
         }
 
-        function sendTestEmail() {
-            const email = prompt('Send to:') || document.getElementById('emailUser').value;
+        async function sendTestEmail() {
+            const email = prompt('Send test to:') || document.getElementById('emailUser').value;
             if (!email) return;
             document.getElementById('settingsLoading').style.display = 'block';
             setTimeout(() => {
@@ -461,6 +517,7 @@
             }, 1500);
         }
 
+        // ==================== INIT ====================
         loadDashboard();
     </script>
 </body>
