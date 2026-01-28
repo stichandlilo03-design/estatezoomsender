@@ -5,12 +5,17 @@ const cors = require('cors');
 const multer = require('multer');
 const { parse } = require('csv-parse/sync');
 const XLSX = require('xlsx');
+const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Multer config
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+// Multer setup
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } 
+});
 
 // Middleware
 app.use(cors());
@@ -18,18 +23,14 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb' }));
 app.use(express.static('public'));
 
-// Database - Using file-based for Vercel
-const dbPath = process.env.SQLITE_PATH || './campaigns.db';
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) console.error('❌ DB Error:', err);
-  else console.log('✅ Database ready at', dbPath);
-});
+// Database
+const dbPath = './campaigns.db';
+const db = new sqlite3.Database(dbPath);
 
-// Create tables
+// Initialize DB
 db.serialize(() => {
-  // Leads table
   db.run(`CREATE TABLE IF NOT EXISTS leads (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     firstName TEXT,
     lastName TEXT,
     email TEXT UNIQUE,
@@ -37,473 +38,395 @@ db.serialize(() => {
     propertyAddress TEXT,
     propertyPrice TEXT,
     propertyType TEXT,
-    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    createdAt DATETIME
   )`);
   
-  // Email templates table
-  db.run(`CREATE TABLE IF NOT EXISTS emailTemplates (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+  db.run(`CREATE TABLE IF NOT EXISTS templates (
+    id INTEGER PRIMARY KEY,
     name TEXT,
     subject TEXT,
-    htmlContent TEXT,
-    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    html TEXT
   )`);
   
-  // Campaigns table - TRACK SENDING
-  db.run(`CREATE TABLE IF NOT EXISTS campaigns (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    campaignName TEXT,
-    templateId INTEGER,
-    leadCount INTEGER,
-    sentCount INTEGER DEFAULT 0,
-    failureCount INTEGER DEFAULT 0,
-    status TEXT DEFAULT 'pending',
-    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-    startedAt DATETIME,
-    completedAt DATETIME
-  )`);
-
-  // Campaign logs - DETAILED TRACKING
-  db.run(`CREATE TABLE IF NOT EXISTS campaignLogs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    campaignId INTEGER,
-    leadId INTEGER,
-    leadEmail TEXT,
-    status TEXT,
-    message TEXT,
-    sentAt DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-  
-  // SMTP settings table
   db.run(`CREATE TABLE IF NOT EXISTS smtpSettings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    smtpHost TEXT,
-    smtpPort INTEGER,
-    smtpSecure BOOLEAN,
-    emailUser TEXT,
-    emailPassword TEXT,
-    companyName TEXT,
-    companyEmail TEXT,
-    companyPhone TEXT
+    id INTEGER PRIMARY KEY,
+    host TEXT,
+    port INTEGER,
+    secure BOOLEAN,
+    user TEXT,
+    pass TEXT,
+    company TEXT,
+    email TEXT,
+    phone TEXT
   )`);
 
-  // Insert default template if not exists
-  const defaultTemplate = `<html><body style="font-family: Arial; background: #f4f4f4;"><table width="100%"><tr><td align="center" style="padding: 20px;"><table width="600" style="background: white; border-radius: 8px;"><tr><td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; text-align: center; border-radius: 8px 8px 0 0;"><h1>Great News!</h1></td></tr><tr><td style="padding: 40px;"><p>Hi {{firstName}},</p><p>We have exciting news about your property at {{propertyAddress}}!</p><p>Valued at: {{propertyPrice}}</p><p>Type: {{propertyType}}</p><p>Let's schedule a meeting to discuss this amazing opportunity!</p><p><strong>Date:</strong> {{meetingDate}}<br><strong>Time:</strong> {{meetingTime}}</p><p><a href="{{zoomLink}}" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block;">Join Zoom Meeting</a></p><p>Best regards,<br>{{companyName}}<br>{{companyPhone}}</p></td></tr></table></td></tr></table></body></html>`;
+  db.run(`INSERT OR IGNORE INTO templates (id, name, subject, html) 
+    VALUES (1, 'Default', 'Hello {{firstName}}', '<h1>Hello {{firstName}}</h1><p>Property: {{propertyAddress}}</p>')`);
   
-  db.run(`INSERT OR IGNORE INTO emailTemplates (id, name, subject, htmlContent) VALUES (1, 'Default Template', 'Property Update: {{propertyAddress}}', ?)`, [defaultTemplate]);
-  db.run(`INSERT OR IGNORE INTO smtpSettings (id, smtpHost, smtpPort) VALUES (1, 'smtp.gmail.com', 587)`);
+  db.run(`INSERT OR IGNORE INTO smtpSettings (id, host, port, secure) 
+    VALUES (1, 'smtp.gmail.com', 587, 0)`);
 });
 
-let emailTransporter = null;
-
-// ==================== HELPER FUNCTIONS ====================
-function getEmailTransporter() {
+// Helper: DB promisified
+function dbGet(sql, params = []) {
   return new Promise((resolve, reject) => {
-    db.get('SELECT * FROM smtpSettings WHERE id = 1', (err, settings) => {
-      if (err) return reject(err);
-      if (!settings || !settings.emailUser || !settings.emailPassword) {
-        return reject(new Error('SMTP settings not configured'));
-      }
-
-      const transporter = nodemailer.createTransport({
-        host: settings.smtpHost,
-        port: settings.smtpPort,
-        secure: settings.smtpSecure === 1 || settings.smtpSecure === true,
-        auth: {
-          user: settings.emailUser,
-          pass: settings.emailPassword
-        }
-      });
-
-      resolve({ transporter, settings });
+    db.get(sql, params, (err, row) => {
+      if (err) reject(err);
+      else resolve(row);
     });
   });
 }
 
-function replaceVariables(template, data) {
-  let content = template;
-  content = content.replace(/{{firstName}}/g, data.firstName || '');
-  content = content.replace(/{{lastName}}/g, data.lastName || '');
-  content = content.replace(/{{email}}/g, data.email || '');
-  content = content.replace(/{{phone}}/g, data.phone || '');
-  content = content.replace(/{{propertyAddress}}/g, data.propertyAddress || '');
-  content = content.replace(/{{propertyPrice}}/g, data.propertyPrice || '');
-  content = content.replace(/{{propertyType}}/g, data.propertyType || '');
-  content = content.replace(/{{zoomLink}}/g, data.zoomLink || '');
-  content = content.replace(/{{meetingDate}}/g, data.meetingDate || '');
-  content = content.replace(/{{meetingTime}}/g, data.meetingTime || '');
-  content = content.replace(/{{companyName}}/g, data.companyName || '');
-  content = content.replace(/{{companyPhone}}/g, data.companyPhone || '');
-  return content;
+function dbAll(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows || []);
+    });
+  });
 }
 
-// ==================== API ENDPOINTS ====================
-
-// GET Leads
-app.get('/api/leads', (req, res) => {
-  db.all('SELECT * FROM leads ORDER BY createdAt DESC', (err, leads) => {
-    res.json(leads || []);
+function dbRun(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function(err) {
+      if (err) reject(err);
+      else resolve(this);
+    });
   });
-});
+}
 
-// POST Add Lead
-app.post('/api/leads', (req, res) => {
-  const { firstName, lastName, email, phone, propertyAddress, propertyPrice, propertyType } = req.body;
-  if (!email) return res.status(400).json({ success: false, error: 'Email required' });
-  
-  db.run(
-    `INSERT INTO leads (firstName, lastName, email, phone, propertyAddress, propertyPrice, propertyType) 
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [firstName || '', lastName || '', email, phone || '', propertyAddress || '', propertyPrice || '', propertyType || ''],
-    function(err) {
-      if (err) return res.status(400).json({ success: false, error: 'Email already exists' });
-      res.json({ success: true, id: this.lastID });
-    }
-  );
-});
+// ==================== LEADS ====================
 
-// DELETE Lead
-app.delete('/api/leads/:id', (req, res) => {
-  db.run('DELETE FROM leads WHERE id = ?', [req.params.id], function(err) {
-    res.json({ success: !err });
-  });
-});
-
-// FILE UPLOAD - CSV/EXCEL
-app.post('/api/leads/upload', upload.single('file'), (req, res) => {
+app.get('/api/leads', async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ success: false, inserted: 0, failed: 0, error: 'No file' });
+    const leads = await dbAll('SELECT * FROM leads ORDER BY id DESC');
+    res.json(leads);
+  } catch (e) {
+    res.json([]);
+  }
+});
+
+app.post('/api/leads', async (req, res) => {
+  try {
+    const { firstName, lastName, email, phone, propertyAddress, propertyPrice, propertyType } = req.body;
+    if (!email) return res.json({ success: false, error: 'Email required' });
+    
+    const now = new Date().toISOString();
+    await dbRun(
+      'INSERT INTO leads (firstName, lastName, email, phone, propertyAddress, propertyPrice, propertyType, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [firstName || '', lastName || '', email, phone || '', propertyAddress || '', propertyPrice || '', propertyType || '', now]
+    );
+    res.json({ success: true });
+  } catch (e) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
+app.delete('/api/leads/:id', async (req, res) => {
+  try {
+    await dbRun('DELETE FROM leads WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (e) {
+    res.json({ success: false });
+  }
+});
+
+// ==================== UPLOAD ====================
+
+app.post('/api/leads/upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.json({ success: false, inserted: 0, failed: 0 });
+    }
 
     const fileName = req.file.originalname.toLowerCase();
-    const buffer = req.file.buffer;
     let rows = [];
 
     if (fileName.endsWith('.csv')) {
-      const csv = buffer.toString('utf-8');
-      rows = parse(csv, { columns: true, skip_empty_lines: true });
+      rows = parse(req.file.buffer.toString('utf-8'), { 
+        columns: true, 
+        skip_empty_lines: true 
+      });
     } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-      const workbook = XLSX.read(buffer, { type: 'buffer' });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      rows = XLSX.utils.sheet_to_json(sheet);
+      const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
+      rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
     } else {
-      return res.status(400).json({ success: false, inserted: 0, failed: 0, error: 'Invalid format' });
+      return res.json({ success: false, inserted: 0, failed: 0 });
     }
 
     if (!rows || rows.length === 0) {
-      return res.status(400).json({ success: false, inserted: 0, failed: 0, error: 'No data' });
+      return res.json({ success: false, inserted: 0, failed: 0 });
     }
 
-    const detectColumn = (name) => {
+    // Map columns
+    const mapCol = (name) => {
       const n = name.toLowerCase().trim();
       if (n.includes('first')) return 'firstName';
       if (n.includes('last')) return 'lastName';
       if (n.includes('email')) return 'email';
       if (n.includes('phone')) return 'phone';
-      if (n.includes('address') || n.includes('property')) return 'propertyAddress';
+      if (n.includes('address')) return 'propertyAddress';
       if (n.includes('price')) return 'propertyPrice';
       if (n.includes('type')) return 'propertyType';
       return null;
     };
 
     const colMap = {};
-    Object.keys(rows[0]).forEach(col => {
-      const mapped = detectColumn(col);
+    const headers = Object.keys(rows[0] || {});
+    headers.forEach(col => {
+      const mapped = mapCol(col);
       if (mapped) colMap[col] = mapped;
     });
 
     if (!Object.values(colMap).includes('email')) {
-      return res.status(400).json({ success: false, inserted: 0, failed: 0, error: 'No email column' });
+      return res.json({ success: false, inserted: 0, failed: 0 });
     }
 
-    let inserted = 0, failed = 0, processed = 0;
+    let inserted = 0;
+    let failed = 0;
+    const now = new Date().toISOString();
 
-    rows.forEach((row) => {
-      const lead = { firstName: '', lastName: '', email: '', phone: '', propertyAddress: '', propertyPrice: '', propertyType: '' };
-      Object.keys(colMap).forEach(col => {
-        lead[colMap[col]] = (row[col] || '').toString().trim();
-      });
+    for (const row of rows) {
+      try {
+        const lead = {};
+        Object.keys(colMap).forEach(col => {
+          lead[colMap[col]] = (row[col] || '').toString().trim();
+        });
 
-      if (!lead.email) {
-        failed++;
-        processed++;
-        if (processed === rows.length) finishUpload();
-        return;
-      }
-
-      db.run(
-        `INSERT OR IGNORE INTO leads (firstName, lastName, email, phone, propertyAddress, propertyPrice, propertyType) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [lead.firstName, lead.lastName, lead.email, lead.phone, lead.propertyAddress, lead.propertyPrice, lead.propertyType],
-        function(err) {
-          if (err || this.changes === 0) {
-            failed++;
-          } else {
-            inserted++;
-          }
-          processed++;
-          if (processed === rows.length) finishUpload();
+        if (!lead.email) {
+          failed++;
+          continue;
         }
-      );
-    });
 
-    function finishUpload() {
-      res.json({ success: true, inserted, failed, total: rows.length });
+        await dbRun(
+          'INSERT OR IGNORE INTO leads (firstName, lastName, email, phone, propertyAddress, propertyPrice, propertyType, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [
+            lead.firstName || '',
+            lead.lastName || '',
+            lead.email,
+            lead.phone || '',
+            lead.propertyAddress || '',
+            lead.propertyPrice || '',
+            lead.propertyType || '',
+            now
+          ]
+        );
+        inserted++;
+      } catch (e) {
+        failed++;
+      }
     }
 
+    res.json({ success: true, inserted, failed });
   } catch (error) {
-    res.status(500).json({ success: false, inserted: 0, failed: 0, error: error.message });
+    res.json({ success: false, inserted: 0, failed: 0 });
   }
 });
 
-// GET Templates
-app.get('/api/templates', (req, res) => {
-  db.all('SELECT id, name, subject FROM emailTemplates', (err, templates) => {
-    res.json(templates || []);
-  });
+// ==================== TEMPLATES ====================
+
+app.get('/api/templates', async (req, res) => {
+  try {
+    const templates = await dbAll('SELECT * FROM templates');
+    res.json(templates);
+  } catch (e) {
+    res.json([]);
+  }
 });
 
-// GET Single Template
-app.get('/api/templates/:id', (req, res) => {
-  db.get('SELECT * FROM emailTemplates WHERE id = ?', [req.params.id], (err, template) => {
+app.get('/api/templates/:id', async (req, res) => {
+  try {
+    const template = await dbGet('SELECT * FROM templates WHERE id = ?', [req.params.id]);
     res.json(template || {});
-  });
-});
-
-// POST/UPDATE Template
-app.post('/api/templates', (req, res) => {
-  const { id, name, subject, htmlContent } = req.body;
-  if (!name || !subject || !htmlContent) return res.status(400).json({ success: false });
-
-  if (id) {
-    db.run(`UPDATE emailTemplates SET name = ?, subject = ?, htmlContent = ? WHERE id = ?`,
-      [name, subject, htmlContent, id],
-      function(err) {
-        res.json({ success: !err, id });
-      }
-    );
-  } else {
-    db.run(`INSERT INTO emailTemplates (name, subject, htmlContent) VALUES (?, ?, ?)`,
-      [name, subject, htmlContent],
-      function(err) {
-        res.json({ success: !err, id: this.lastID });
-      }
-    );
+  } catch (e) {
+    res.json({});
   }
 });
 
-// DELETE Template
-app.delete('/api/templates/:id', (req, res) => {
-  db.run('DELETE FROM emailTemplates WHERE id = ?', [req.params.id], () => {
-    res.json({ success: true });
-  });
-});
-
-// GET SMTP Settings
-app.get('/api/smtp-settings', (req, res) => {
-  db.get('SELECT * FROM smtpSettings WHERE id = 1', (err, settings) => {
-    res.json(settings || {
-      smtpHost: '',
-      smtpPort: 587,
-      smtpSecure: false,
-      emailUser: '',
-      companyName: '',
-      companyEmail: '',
-      companyPhone: ''
-    });
-  });
-});
-
-// POST SMTP Settings & Test
-app.post('/api/smtp-settings', (req, res) => {
-  const { smtpHost, smtpPort, smtpSecure, emailUser, emailPassword, companyName, companyEmail, companyPhone } = req.body;
-  
-  db.run(
-    `INSERT OR REPLACE INTO smtpSettings (id, smtpHost, smtpPort, smtpSecure, emailUser, emailPassword, companyName, companyEmail, companyPhone)
-     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [smtpHost, smtpPort, smtpSecure ? 1 : 0, emailUser, emailPassword, companyName, companyEmail, companyPhone],
-    function(err) {
-      res.json({ success: !err });
+app.post('/api/templates', async (req, res) => {
+  try {
+    const { id, name, subject, html } = req.body;
+    
+    if (id) {
+      await dbRun('UPDATE templates SET name = ?, subject = ?, html = ? WHERE id = ?', 
+        [name, subject, html, id]);
+    } else {
+      await dbRun('INSERT INTO templates (name, subject, html) VALUES (?, ?, ?)', 
+        [name, subject, html]);
     }
-  );
+    res.json({ success: true });
+  } catch (e) {
+    res.json({ success: false, error: e.message });
+  }
 });
 
-// TEST SMTP Connection
+// ==================== SMTP ====================
+
+app.get('/api/smtp-settings', async (req, res) => {
+  try {
+    const settings = await dbGet('SELECT * FROM smtpSettings WHERE id = 1');
+    res.json(settings || {
+      host: '',
+      port: 587,
+      secure: false,
+      user: '',
+      pass: '',
+      company: '',
+      email: '',
+      phone: ''
+    });
+  } catch (e) {
+    res.json({});
+  }
+});
+
+app.post('/api/smtp-settings', async (req, res) => {
+  try {
+    const { host, port, secure, user, pass, company, email, phone } = req.body;
+    
+    await dbRun(
+      'INSERT OR REPLACE INTO smtpSettings (id, host, port, secure, user, pass, company, email, phone) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [host, port, secure ? 1 : 0, user, pass, company, email, phone]
+    );
+    res.json({ success: true });
+  } catch (e) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
+// ==================== SMTP TEST ====================
+
 app.post('/api/smtp-test', async (req, res) => {
   try {
-    const { transporter } = await getEmailTransporter();
-    await transporter.verify();
-    res.json({ success: true, message: 'SMTP connection successful' });
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
+    const settings = await dbGet('SELECT * FROM smtpSettings WHERE id = 1');
+    
+    if (!settings || !settings.host || !settings.user || !settings.pass) {
+      return res.json({ success: false, error: 'Settings incomplete' });
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: settings.host,
+      port: settings.port,
+      secure: settings.secure === 1,
+      auth: {
+        user: settings.user,
+        pass: settings.pass
+      }
+    });
+
+    const verified = await transporter.verify();
+    if (verified) {
+      res.json({ success: true, message: 'SMTP connection successful' });
+    } else {
+      res.json({ success: false, error: 'Verification failed' });
+    }
+  } catch (error) {
+    res.json({ success: false, error: error.message });
   }
 });
 
-// SEND TEST EMAIL
+// ==================== TEST EMAIL ====================
+
 app.post('/api/smtp-test-email', async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ success: false, error: 'Email required' });
+    if (!email) return res.json({ success: false, error: 'Email required' });
 
-    const { transporter, settings } = await getEmailTransporter();
+    const settings = await dbGet('SELECT * FROM smtpSettings WHERE id = 1');
+    
+    if (!settings || !settings.user || !settings.pass) {
+      return res.json({ success: false, error: 'SMTP not configured' });
+    }
 
-    await transporter.sendMail({
-      from: settings.emailUser,
-      to: email,
-      subject: 'Test Email from Campaign Manager',
-      html: `<h1>Success!</h1><p>This is a test email from your Email Campaign Manager.</p><p>If you received this, your SMTP settings are working correctly!</p>`
+    const transporter = nodemailer.createTransport({
+      host: settings.host,
+      port: settings.port,
+      secure: settings.secure === 1,
+      auth: {
+        user: settings.user,
+        pass: settings.pass
+      }
     });
 
-    res.json({ success: true, message: 'Test email sent' });
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
+    await transporter.sendMail({
+      from: settings.user,
+      to: email,
+      subject: 'Test Email',
+      html: '<h1>Test Successful!</h1><p>Your SMTP is working correctly.</p>'
+    });
+
+    res.json({ success: true, message: 'Email sent' });
+  } catch (error) {
+    res.json({ success: false, error: error.message });
   }
 });
 
-// SEND CAMPAIGN - REAL EMAIL SENDING
+// ==================== SEND CAMPAIGN ====================
+
 app.post('/api/campaigns/send', async (req, res) => {
   try {
-    const { templateId, leadIds, campaignName, zoomLink, meetingDate, meetingTime } = req.body;
+    const { templateId, subject, zoomLink, meetingDate, meetingTime } = req.body;
+    
+    const template = await dbGet('SELECT * FROM templates WHERE id = ?', [templateId]);
+    if (!template) return res.json({ success: false, error: 'Template not found' });
 
-    if (!templateId) return res.status(400).json({ success: false, error: 'Template required' });
-    if (!leadIds || leadIds.length === 0) return res.status(400).json({ success: false, error: 'No leads selected' });
+    const leads = await dbAll('SELECT * FROM leads');
+    if (leads.length === 0) return res.json({ success: false, error: 'No leads' });
 
-    // Get template
-    const template = await new Promise((resolve, reject) => {
-      db.get('SELECT * FROM emailTemplates WHERE id = ?', [templateId], (err, tmpl) => {
-        if (err) reject(err);
-        else resolve(tmpl);
-      });
+    const settings = await dbGet('SELECT * FROM smtpSettings WHERE id = 1');
+    if (!settings || !settings.user || !settings.pass) {
+      return res.json({ success: false, error: 'SMTP not configured' });
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: settings.host,
+      port: settings.port,
+      secure: settings.secure === 1,
+      auth: {
+        user: settings.user,
+        pass: settings.pass
+      }
     });
 
-    if (!template) return res.status(400).json({ success: false, error: 'Template not found' });
+    let sent = 0;
+    let failed = 0;
 
-    // Get SMTP settings
-    const { transporter, settings } = await getEmailTransporter();
-
-    // Create campaign record
-    const campaignId = await new Promise((resolve, reject) => {
-      db.run(
-        `INSERT INTO campaigns (campaignName, templateId, leadCount, status, startedAt) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-        [campaignName || 'Campaign', templateId, leadIds.length],
-        function(err) {
-          if (err) reject(err);
-          else resolve(this.lastID);
-        }
-      );
-    });
-
-    // Send emails
-    let sentCount = 0;
-    let failureCount = 0;
-
-    for (const leadId of leadIds) {
+    for (const lead of leads) {
       try {
-        const lead = await new Promise((resolve, reject) => {
-          db.get('SELECT * FROM leads WHERE id = ?', [leadId], (err, l) => {
-            if (err) reject(err);
-            else resolve(l);
-          });
-        });
+        let html = template.html;
+        html = html.replace(/{{firstName}}/g, lead.firstName || '');
+        html = html.replace(/{{lastName}}/g, lead.lastName || '');
+        html = html.replace(/{{propertyAddress}}/g, lead.propertyAddress || '');
+        html = html.replace(/{{propertyPrice}}/g, lead.propertyPrice || '');
+        html = html.replace(/{{propertyType}}/g, lead.propertyType || '');
+        html = html.replace(/{{zoomLink}}/g, zoomLink || '');
+        html = html.replace(/{{meetingDate}}/g, meetingDate || '');
+        html = html.replace(/{{meetingTime}}/g, meetingTime || '');
 
-        if (!lead) continue;
+        let subj = template.subject;
+        subj = subj.replace(/{{firstName}}/g, lead.firstName || '');
+        subj = subj.replace(/{{propertyAddress}}/g, lead.propertyAddress || '');
 
-        // Replace variables
-        const subject = replaceVariables(template.subject, { ...lead, zoomLink, meetingDate, meetingTime, companyName: settings.companyName });
-        const html = replaceVariables(template.htmlContent, { ...lead, zoomLink, meetingDate, meetingTime, companyName: settings.companyName, companyPhone: settings.companyPhone });
-
-        // Send email
         await transporter.sendMail({
-          from: settings.emailUser,
+          from: settings.user,
           to: lead.email,
-          subject: subject,
+          subject: subj,
           html: html
         });
 
-        sentCount++;
-
-        // Log success
-        await new Promise((resolve, reject) => {
-          db.run(
-            `INSERT INTO campaignLogs (campaignId, leadId, leadEmail, status, message) VALUES (?, ?, ?, ?, ?)`,
-            [campaignId, leadId, lead.email, 'success', 'Email sent successfully'],
-            (err) => {
-              if (err) reject(err);
-              else resolve();
-            }
-          );
-        });
-
-      } catch (emailErr) {
-        failureCount++;
-        
-        // Log failure
-        await new Promise((resolve, reject) => {
-          db.run(
-            `INSERT INTO campaignLogs (campaignId, leadId, leadEmail, status, message) VALUES (?, ?, ?, ?, ?)`,
-            [campaignId, '', '', 'failed', emailErr.message],
-            (err) => {
-              if (err) reject(err);
-              else resolve();
-            }
-          );
-        });
+        sent++;
+      } catch (e) {
+        failed++;
       }
     }
 
-    // Update campaign status
-    await new Promise((resolve, reject) => {
-      db.run(
-        `UPDATE campaigns SET sentCount = ?, failureCount = ?, status = 'completed', completedAt = CURRENT_TIMESTAMP WHERE id = ?`,
-        [sentCount, failureCount, campaignId],
-        (err) => {
-          if (err) reject(err);
-          else resolve();
-        }
-      );
-    });
-
-    res.json({ success: true, campaignId, sentCount, failureCount, total: leadIds.length });
-
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.json({ success: true, sent, failed, total: leads.length });
+  } catch (error) {
+    res.json({ success: false, error: error.message });
   }
-});
-
-// GET Campaign Log
-app.get('/api/campaigns/:id/logs', (req, res) => {
-  db.all(
-    'SELECT * FROM campaignLogs WHERE campaignId = ? ORDER BY sentAt DESC',
-    [req.params.id],
-    (err, logs) => {
-      res.json(logs || []);
-    }
-  );
-});
-
-// GET Campaigns
-app.get('/api/campaigns', (req, res) => {
-  db.all(
-    'SELECT * FROM campaigns ORDER BY createdAt DESC LIMIT 50',
-    (err, campaigns) => {
-      res.json(campaigns || []);
-    }
-  );
-});
-
-// GET Campaign Stats
-app.get('/api/campaigns/stats', (req, res) => {
-  db.all('SELECT SUM(sentCount) as totalSent, SUM(failureCount) as totalFailed, COUNT(*) as campaigns FROM campaigns', (err, stats) => {
-    const row = (stats && stats[0]) || {};
-    res.json({
-      totalSent: row.totalSent || 0,
-      totalFailed: row.totalFailed || 0,
-      campaigns: row.campaigns || 0
-    });
-  });
 });
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`\n🚀 Server running on port ${PORT}`);
-  console.log('✅ All endpoints ready\n');
+  console.log(`\n✅ Server running on port ${PORT}\n`);
 });
