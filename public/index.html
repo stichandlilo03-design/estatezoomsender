@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Campaign Manager Pro v3.0</title>
+    <title>Email Campaign Manager Pro v3.0 - ADVANCED</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; color: #333; }
         .container { max-width: 1800px; margin: 0 auto; }
         header { background: white; padding: 30px; border-radius: 12px; margin-bottom: 30px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15); border-top: 5px solid #667eea; }
-        h1 { color: #333; margin-bottom: 5px; font-size: 32px; font-weight: 700; }
+        h1 { color: #333; margin-bottom: 5px; font-size: 32px; font-weight: 700; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .subtitle { color: #666; margin-top: 5px; font-size: 14px; }
         .tabs { display: flex; gap: 10px; margin-top: 20px; border-bottom: 2px solid #e0e0e0; flex-wrap: wrap; }
         .tab-button { padding: 12px 24px; border: none; background: transparent; cursor: pointer; font-weight: 600; color: #666; border-bottom: 3px solid transparent; transition: all 0.3s; }
@@ -20,14 +20,15 @@
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1); margin-bottom: 20px; }
         .card h2 { color: #333; margin-bottom: 20px; font-size: 20px; border-bottom: 3px solid #667eea; padding-bottom: 12px; }
         .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .stat-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3); }
+        .stat-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3); cursor: pointer; transition: all 0.3s; }
+        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4); }
         .stat-number { font-size: 36px; font-weight: bold; margin: 10px 0; }
         .stat-label { font-size: 12px; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px; }
         .form-group { margin-bottom: 18px; }
         label { display: block; color: #333; font-weight: 600; margin-bottom: 8px; font-size: 14px; }
         input, textarea, select { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-family: inherit; font-size: 14px; }
         input:focus, textarea:focus, select:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1); }
-        textarea { resize: vertical; min-height: 150px; }
+        textarea { resize: vertical; min-height: 150px; font-family: 'Courier New', monospace; }
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         @media (max-width: 768px) { .form-row { grid-template-columns: 1fr; } }
         .button-group { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
@@ -52,28 +53,40 @@
         .msg { padding: 15px; border-radius: 8px; margin-bottom: 15px; display: none; border-left: 4px solid; }
         .msg-success { background: #D1FAE5; border-left-color: #10B981; color: #065F46; }
         .msg-error { background: #FEE2E2; border-left-color: #EF4444; color: #991B1B; }
-        .msg-info { background: #DBEAFE; border-left-color: #3b82f6; color: #1e40af; }
         .msg-warning { background: #FEF3C7; border-left-color: #F59E0B; color: #92400E; }
         .loading { display: none; text-align: center; color: #667eea; font-weight: 600; margin: 20px 0; }
         .spinner { display: inline-block; width: 24px; height: 24px; border: 4px solid #e0e0e0; border-top-color: #667eea; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 10px; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .info-box { background: #f0f9ff; border-left: 4px solid #667eea; padding: 15px; border-radius: 8px; margin: 15px 0; font-size: 13px; color: #1e40af; }
         .table-container { overflow-x: auto; margin-top: 15px; }
-        .test-result { padding: 15px; border-radius: 8px; margin: 15px 0; font-weight: 600; }
-        .test-result.success { background: #D1FAE5; border-left: 4px solid #10B981; color: #065F46; }
-        .test-result.error { background: #FEE2E2; border-left: 4px solid #EF4444; color: #991B1B; }
+        .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .badge-success { background: #D1FAE5; color: #065F46; }
+        .badge-error { background: #FEE2E2; color: #991B1B; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 1000; overflow-y: auto; padding: 20px; }
+        .modal.active { display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: white; border-radius: 12px; padding: 30px; max-width: 900px; width: 100%; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); max-height: 85vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 2px solid #e0e0e0; padding-bottom: 15px; }
+        .modal-close { background: none; border: none; cursor: pointer; font-size: 28px; color: #666; width: auto; min-width: auto; padding: 0; flex: 0; box-shadow: none; }
+        .modal-close:hover { color: #ef4444; }
+        .email-preview { border: 2px solid #e0e0e0; border-radius: 8px; padding: 20px; background: #f8f9fa; margin: 15px 0; line-height: 1.6; }
+        .log-item { padding: 12px; border-left: 4px solid #667eea; background: #f8f9fa; margin-bottom: 10px; border-radius: 6px; }
+        .log-success { border-left-color: #10B981; background: #ecfdf5; }
+        .log-error { border-left-color: #ef4444; background: #fef2f2; }
+        .progress-bar { width: 100%; height: 8px; background: #e0e0e0; border-radius: 4px; margin: 10px 0; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); width: 0%; transition: width 0.3s; }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>📧 Email Campaign Manager Pro v3.0</h1>
-            <p class="subtitle">✓ All Features • ✓ Real SMTP Testing • ✓ Production Ready</p>
+            <h1>📧 Email Campaign Manager Pro v3.0 - ADVANCED</h1>
+            <p class="subtitle">✨ Real Email Sending • 📋 Live Sending Logs • 👁️ Email Preview • 🚀 Production Ready</p>
             <div class="tabs">
                 <button class="tab-button active" onclick="switchTab(event, 'dashboard')">📊 Dashboard</button>
                 <button class="tab-button" onclick="switchTab(event, 'leads')">👥 Leads</button>
                 <button class="tab-button" onclick="switchTab(event, 'templates')">📝 Templates</button>
                 <button class="tab-button" onclick="switchTab(event, 'campaigns')">🚀 Campaigns</button>
+                <button class="tab-button" onclick="switchTab(event, 'logs')">📋 Sending Logs</button>
                 <button class="tab-button" onclick="switchTab(event, 'smtp')">⚙️ SMTP</button>
             </div>
         </header>
@@ -81,18 +94,29 @@
         <!-- DASHBOARD -->
         <div id="dashboard" class="tab-content active">
             <div class="dashboard-grid">
-                <div class="stat-card"><div class="stat-label">👥 Total Leads</div><div class="stat-number" id="dashLeads">0</div></div>
-                <div class="stat-card"><div class="stat-label">📝 Templates</div><div class="stat-number" id="dashTemplates">0</div></div>
-                <div class="stat-card"><div class="stat-label">📧 With Email</div><div class="stat-number" id="dashEmail">0</div></div>
-                <div class="stat-card"><div class="stat-label">📞 With Phone</div><div class="stat-number" id="dashPhone">0</div></div>
+                <div class="stat-card" onclick="switchTab({target:{classList:{add:'active'}}}, 'leads')">
+                    <div class="stat-label">👥 Total Leads</div>
+                    <div class="stat-number" id="dashLeads">0</div>
+                </div>
+                <div class="stat-card" onclick="switchTab({target:{classList:{add:'active'}}}, 'templates')">
+                    <div class="stat-label">📝 Templates</div>
+                    <div class="stat-number" id="dashTemplates">0</div>
+                </div>
+                <div class="stat-card" onclick="switchTab({target:{classList:{add:'active'}}}, 'campaigns')">
+                    <div class="stat-label">🚀 Campaigns Sent</div>
+                    <div class="stat-number" id="dashCampaigns">0</div>
+                </div>
+                <div class="stat-card" onclick="switchTab({target:{classList:{add:'active'}}}, 'logs')">
+                    <div class="stat-label">✉️ Emails Sent</div>
+                    <div class="stat-number" id="dashEmailsSent">0</div>
+                </div>
             </div>
             <div class="card">
-                <h2>📈 Recent Leads (Last 10)</h2>
-                <div class="table-container">
-                    <table>
-                        <thead><tr><th>First Name</th><th>Last Name</th><th>Email</th><th>Phone</th><th>Property Address</th><th>Property Price</th><th>Property Type</th><th>Added</th></tr></thead>
-                        <tbody id="dashActivity"><tr><td colspan="8" style="text-align: center;">No leads yet</td></tr></tbody>
-                    </table>
+                <h2>📈 Quick Stats</h2>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <div><strong>📞 Leads with Phone:</strong> <span id="dashPhone">0</span></div>
+                    <div><strong>⚠️ Failed Emails:</strong> <span id="dashFailed">0</span></div>
+                    <div><strong>✅ Success Rate:</strong> <span id="dashRate">0%</span></div>
                 </div>
             </div>
         </div>
@@ -105,10 +129,10 @@
                     <div id="addMsg" class="msg"></div>
                     <form id="addForm">
                         <div class="form-row">
-                            <div class="form-group"><label>First Name</label><input type="text" id="fn"></div>
-                            <div class="form-group"><label>Last Name</label><input type="text" id="ln"></div>
+                            <div class="form-group"><label>First Name</label><input type="text" id="fn" placeholder="John"></div>
+                            <div class="form-group"><label>Last Name</label><input type="text" id="ln" placeholder="Smith"></div>
                         </div>
-                        <div class="form-group"><label>Email *</label><input type="email" id="em" required placeholder="john@example.com"></div>
+                        <div class="form-group"><label>Email * (Required)</label><input type="email" id="em" required placeholder="john@example.com"></div>
                         <div class="form-row">
                             <div class="form-group"><label>Phone</label><input type="text" id="ph" placeholder="+1-704-555-0101"></div>
                             <div class="form-group"><label>Property Address</label><input type="text" id="ad" placeholder="123 Main Street"></div>
@@ -122,17 +146,17 @@
                 </div>
 
                 <div class="card">
-                    <h2>📤 Bulk Import CSV/Excel</h2>
+                    <h2>📤 Bulk Import</h2>
                     <div id="uploadMsg" class="msg"></div>
-                    <div class="info-box">✓ CSV/Excel support<br>✓ Auto-detect columns<br>✓ Email required<br>✓ Max 10MB</div>
+                    <div class="info-box">✓ CSV/Excel (10MB max)<br>✓ Auto column detection<br>✓ Email column required</div>
                     <div class="file-upload" onclick="document.getElementById('fileInput').click()">
                         <input type="file" id="fileInput" accept=".csv,.xlsx,.xls">
                         <div style="color: #667eea; font-weight: 600;">📁 Click to upload</div>
                     </div>
-                    <div class="loading" id="uploadLoading"><div class="spinner"></div> Processing file...</div>
+                    <div class="loading" id="uploadLoading"><div class="spinner"></div> Processing...</div>
                     <div id="uploadStats" style="display: none; margin-top: 15px;">
-                        <div style="padding: 12px; background: #D1FAE5; border-radius: 6px; margin-bottom: 8px; color: #065F46;">✓ Successfully Added: <span id="addedCount">0</span> leads</div>
-                        <div style="padding: 12px; background: #FEF3C7; border-radius: 6px; color: #92400E;">⚠️ Skipped/Failed: <span id="failedCount">0</span> rows</div>
+                        <div style="padding: 12px; background: #D1FAE5; border-radius: 6px; margin-bottom: 8px; color: #065F46;">✓ Added: <span id="addedCount">0</span></div>
+                        <div style="padding: 12px; background: #FEF3C7; border-radius: 6px; color: #92400E;">⚠ Failed: <span id="failedCount">0</span></div>
                     </div>
                 </div>
             </div>
@@ -140,28 +164,15 @@
             <div class="card">
                 <h2>📋 All Leads Database</h2>
                 <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-                    <input type="text" id="searchLead" placeholder="🔍 Search by name, email, phone..." style="flex: 1; min-width: 200px;">
+                    <input type="text" id="searchLead" placeholder="🔍 Search..." style="flex: 1; min-width: 200px;">
                     <button class="btn-secondary btn-small" onclick="exportLeads()">📥 Export CSV</button>
                     <button class="btn-secondary btn-small" onclick="loadLeads()">🔄 Refresh</button>
                     <button class="btn-danger btn-small" onclick="clearAllLeads()">🗑️ Clear All</button>
                 </div>
                 <div class="table-container">
                     <table>
-                        <thead>
-                            <tr>
-                                <th>First Name</th>
-                                <th>Last Name</th>
-                                <th>Email</th>
-                                <th>Phone</th>
-                                <th>Property Address</th>
-                                <th>Property Price</th>
-                                <th>Property Type</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="leadsTable">
-                            <tr><td colspan="8" style="text-align: center; padding: 40px;">No leads added yet</td></tr>
-                        </tbody>
+                        <thead><tr><th>First Name</th><th>Last Name</th><th>Email</th><th>Phone</th><th>Property Address</th><th>Property Price</th><th>Property Type</th><th>Action</th></tr></thead>
+                        <tbody id="leadsTable"><tr><td colspan="8" style="text-align: center; padding: 40px;">No leads</td></tr></tbody>
                     </table>
                 </div>
             </div>
@@ -171,25 +182,25 @@
         <div id="templates" class="tab-content">
             <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 20px;">
                 <div class="card">
-                    <h2>📚 Email Templates</h2>
+                    <h2>📚 Templates</h2>
                     <button class="btn-success" onclick="createTemplate()" style="width: 100%; margin-bottom: 15px;">+ Create New</button>
                     <div id="templatesList"></div>
                 </div>
                 <div class="card">
-                    <h2>✏️ Template Editor</h2>
+                    <h2>✏️ Editor</h2>
                     <div id="templateMsg" class="msg"></div>
                     <div id="templateEditor" style="display: none;">
                         <form id="templateForm">
-                            <div class="form-group"><label>Template Name</label><input type="text" id="tname" required placeholder="e.g., Property Interest"></div>
+                            <div class="form-group"><label>Template Name</label><input type="text" id="tname" required></div>
                             <div class="form-group"><label>Email Subject</label><input type="text" id="tsubject" required placeholder="e.g., Great News About {{propertyAddress}}"></div>
-                            <div class="form-group"><label>HTML Content</label><textarea id="tcontent" required placeholder="Paste HTML email here..."></textarea></div>
-                            <div class="button-group">
-                                <button type="submit" class="btn-success">💾 Save Template</button>
-                                <button type="button" class="btn-secondary" onclick="cancelEdit()">Cancel</button>
-                            </div>
+                            <div class="form-group"><label>HTML Content</label><textarea id="tcontent" required></textarea></div>
+                            <div style="font-size: 12px; color: #666; background: #f0f0f0; padding: 10px; border-radius: 6px; margin: 10px 0;">Variables: {{firstName}}, {{lastName}}, {{email}}, {{phone}}, {{propertyAddress}}, {{propertyPrice}}, {{propertyType}}, {{zoomLink}}, {{meetingDate}}, {{meetingTime}}, {{companyName}}, {{companyPhone}}</div>
+                            <button type="submit" class="btn-success" style="width: 100%;">💾 Save</button>
+                            <button type="button" class="btn-info btn-small" onclick="previewTemplate()" style="width: 100%; margin-top: 10px;">👁️ Preview</button>
+                            <button type="button" class="btn-secondary" onclick="cancelEdit()" style="width: 100%; margin-top: 10px;">Cancel</button>
                         </form>
                     </div>
-                    <div id="noEditor" style="text-align: center; color: #999; padding: 40px;">Select a template to edit or create new</div>
+                    <div id="noEditor" style="text-align: center; color: #999; padding: 40px;">Select a template</div>
                 </div>
             </div>
         </div>
@@ -202,24 +213,40 @@
                     <div id="campaignMsg" class="msg"></div>
                     <form id="campaignForm">
                         <div class="form-group"><label>Campaign Name</label><input type="text" id="cname" placeholder="e.g., February 2026"></div>
-                        <div class="form-group"><label>Select Template *</label><select id="ctemplate" required><option>-- Select --</option></select></div>
+                        <div class="form-group"><label>Select Template *</label><select id="ctemplate" required><option>Select...</option></select></div>
+                        <div class="form-group"><label>Select Recipients *</label><select id="crecipients" required><option value="">Choose...</option><option value="all">All Leads</option></select></div>
                         <div class="form-group"><label>Zoom Link</label><input type="url" id="czoom" placeholder="https://zoom.us/j/..."></div>
                         <div class="form-row">
                             <div class="form-group"><label>Meeting Date</label><input type="text" id="cdate" placeholder="Feb 14"></div>
                             <div class="form-group"><label>Meeting Time</label><input type="text" id="ctime" placeholder="3:00 PM"></div>
                         </div>
-                        <div class="loading" id="campaignLoading"><div class="spinner"></div> Sending...</div>
+                        <div class="loading" id="campaignLoading"><div class="spinner"></div> Sending to all recipients...</div>
                         <button type="submit" class="btn-success" style="width: 100%;">🎯 Send Campaign</button>
+                        <button type="button" class="btn-info" onclick="previewCampaign()" style="width: 100%; margin-top: 10px;">👁️ Preview</button>
                     </form>
                 </div>
                 <div class="card">
                     <h2>📊 Campaign History</h2>
                     <div class="table-container">
                         <table>
-                            <thead><tr><th>Campaign</th><th>Date</th><th>Status</th></tr></thead>
-                            <tbody id="campaignHistory"><tr><td colspan="3" style="text-align: center;">No campaigns sent</td></tr></tbody>
+                            <thead><tr><th>Campaign</th><th>Sent</th><th>Failed</th><th>Status</th></tr></thead>
+                            <tbody id="campaignHistory"><tr><td colspan="4">No campaigns</td></tr></tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SENDING LOGS -->
+        <div id="logs" class="tab-content">
+            <div class="card">
+                <h2>📋 Sending Logs & History</h2>
+                <div style="margin-bottom: 15px;">
+                    <button class="btn-secondary btn-small" onclick="loadLogs()">🔄 Refresh</button>
+                    <button class="btn-secondary btn-small" onclick="clearLogs()">🗑️ Clear</button>
+                </div>
+                <div id="logsList" style="max-height: 600px; overflow-y: auto;">
+                    <div style="text-align: center; color: #999; padding: 40px;">No logs yet. Send a campaign to see logs here!</div>
                 </div>
             </div>
         </div>
@@ -228,7 +255,7 @@
         <div id="smtp" class="tab-content">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <div class="card">
-                    <h2>📧 SMTP Configuration</h2>
+                    <h2>📧 SMTP Config</h2>
                     <div id="smtpMsg" class="msg"></div>
                     <form id="smtpForm">
                         <div class="form-group"><label>SMTP Host *</label><input type="text" id="shost" required placeholder="smtp.gmail.com"></div>
@@ -237,34 +264,53 @@
                             <div class="form-group"><label>Encryption</label><select id="ssecure"><option value="false">TLS (587)</option><option value="true">SSL (465)</option></select></div>
                         </div>
                         <div class="form-group"><label>Email *</label><input type="email" id="suser" required placeholder="your@gmail.com"></div>
-                        <div class="form-group"><label>Password *</label><input type="password" id="spass" required placeholder="Your password or app password"></div>
-                        <div class="form-group"><label>Company Name</label><input type="text" id="scompany" placeholder="Your Company"></div>
-                        <div class="form-group"><label>Company Email</label><input type="email" id="scenail" placeholder="info@company.com"></div>
-                        <div class="form-group"><label>Company Phone</label><input type="text" id="scphone" placeholder="+1-555-1234"></div>
+                        <div class="form-group"><label>Password *</label><input type="password" id="spass" required></div>
+                        <div class="form-group"><label>Company Name</label><input type="text" id="scompany"></div>
+                        <div class="form-group"><label>Company Email</label><input type="email" id="scenail"></div>
+                        <div class="form-group"><label>Company Phone</label><input type="text" id="scphone"></div>
                         <div class="loading" id="smtpLoading"><div class="spinner"></div> Saving...</div>
-                        <button type="submit" class="btn-success" style="width: 100%;">✅ Save Settings</button>
+                        <button type="submit" class="btn-success" style="width: 100%;">✅ Save</button>
                     </form>
                 </div>
 
                 <div class="card">
-                    <h2>🧪 SMTP Testing & Diagnostics</h2>
+                    <h2>🧪 SMTP Testing</h2>
                     <div id="testMsg" class="msg"></div>
-                    <div class="info-box">Test your SMTP connection before sending campaigns</div>
-                    
                     <button class="btn-info" onclick="testSmtpConnection()" style="width: 100%; margin-bottom: 15px;">🔌 Test Connection</button>
-                    <div id="testConnectionResult" style="display: none;"></div>
-                    
+                    <div id="testConnectionResult"></div>
                     <hr style="margin: 15px 0; border: none; border-top: 2px solid #e0e0e0;">
-                    
-                    <label style="margin-top: 15px;">Test Email Address</label>
+                    <label>Send Test Email</label>
                     <input type="email" id="testEmail" placeholder="your@email.com">
-                    <button class="btn-info" onclick="sendTestEmail()" style="width: 100%; margin-top: 10px;">📧 Send Test Email</button>
-                    <div id="testEmailResult" style="display: none; margin-top: 15px;"></div>
-                    
-                    <div class="info-box" style="margin-top: 15px; margin-bottom: 0; font-size: 12px;">
-                        <strong>📝 Note:</strong> Test results may take a few seconds. If SMTP test passes, you're ready to send campaigns. Email delivery depends on your provider's settings.
-                    </div>
+                    <button class="btn-info" onclick="sendTestEmail()" style="width: 100%; margin-top: 10px;">📧 Send Test</button>
+                    <div id="testEmailResult"></div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EMAIL PREVIEW MODAL -->
+    <div id="emailPreviewModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📧 Email Preview</h2>
+                <button type="button" class="modal-close" onclick="closePreview()">&times;</button>
+            </div>
+            <div id="previewBody"></div>
+            <button class="btn-info" onclick="printPreview()" style="width: 100%; margin-top: 15px;">🖨️ Print</button>
+        </div>
+    </div>
+
+    <!-- CAMPAIGN PREVIEW MODAL -->
+    <div id="campaignPreviewModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>👁️ Campaign Preview</h2>
+                <button type="button" class="modal-close" onclick="closeCampaignPreview()">&times;</button>
+            </div>
+            <div id="campaignPreviewBody"></div>
+            <div style="display: flex; gap: 10px; margin-top: 25px;">
+                <button class="btn-success" onclick="confirmSendCampaign()" style="flex: 1;">✓ Confirm & Send</button>
+                <button class="btn-secondary" onclick="closeCampaignPreview()" style="flex: 1;">Cancel</button>
             </div>
         </div>
     </div>
@@ -279,10 +325,11 @@
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
             document.getElementById(tab).classList.add('active');
-            e.target.classList.add('active');
+            if (e.target.classList) e.target.classList.add('active');
             if (tab === 'leads') loadLeads();
             if (tab === 'templates') loadTemplates();
-            if (tab === 'campaigns') { loadLeads(); loadTemplates(); }
+            if (tab === 'campaigns') { loadLeads(); loadTemplates(); loadCampaigns(); }
+            if (tab === 'logs') loadLogs();
             if (tab === 'dashboard') loadDashboard();
         }
 
@@ -299,17 +346,17 @@
             leads = await lr.json();
             const tr = await fetch(`${API}/templates`);
             templates = await tr.json();
+            const cr = await fetch(`${API}/campaigns/stats`);
+            const stats = await cr.json();
             
             document.getElementById('dashLeads').textContent = leads.length;
             document.getElementById('dashTemplates').textContent = templates.length;
-            document.getElementById('dashEmail').textContent = leads.length;
+            document.getElementById('dashCampaigns').textContent = stats.campaigns || 0;
+            document.getElementById('dashEmailsSent').textContent = stats.totalSent || 0;
             document.getElementById('dashPhone').textContent = leads.filter(l => l.phone).length;
-            
-            const html = leads.slice(0, 10).map(l => 
-                `<tr><td>${l.firstName || '—'}</td><td>${l.lastName || '—'}</td><td>${l.email}</td><td>${l.phone || '—'}</td><td>${l.propertyAddress || '—'}</td><td><strong style="color: #10B981;">${l.propertyPrice || '—'}</strong></td><td>${l.propertyType || '—'}</td><td>${new Date(l.createdAt).toLocaleDateString()}</td></tr>`
-            ).join('') || '<tr><td colspan="8" style="text-align: center;">No leads</td></tr>';
-            
-            document.getElementById('dashActivity').innerHTML = html;
+            document.getElementById('dashFailed').textContent = stats.totalFailed || 0;
+            const rate = stats.totalSent > 0 ? Math.round((stats.totalSent / (stats.totalSent + stats.totalFailed)) * 100) : 0;
+            document.getElementById('dashRate').textContent = rate + '%';
         }
 
         async function loadLeads() {
@@ -320,50 +367,33 @@
 
         function renderLeads() {
             const search = document.getElementById('searchLead')?.value?.toLowerCase() || '';
-            const f = leads.filter(l => (l.firstName + ' ' + l.lastName + ' ' + l.email + ' ' + l.phone).toLowerCase().includes(search));
-            
-            const html = f.length ? f.map(l => `
-                <tr>
-                    <td>${l.firstName || '—'}</td>
-                    <td>${l.lastName || '—'}</td>
-                    <td>${l.email}</td>
-                    <td>${l.phone || '—'}</td>
-                    <td>${l.propertyAddress || '—'}</td>
-                    <td><strong style="color: #10B981;">${l.propertyPrice || '—'}</strong></td>
-                    <td>${l.propertyType || '—'}</td>
-                    <td><button class="btn-danger btn-small" onclick="deleteLead(${l.id})">🗑️</button></td>
-                </tr>
-            `).join('') : '<tr><td colspan="8" style="text-align: center; padding: 40px;">No leads found</td></tr>';
-            
+            const f = leads.filter(l => (l.firstName + l.lastName + l.email + l.phone).toLowerCase().includes(search));
+            const html = f.length ? f.map(l => `<tr><td>${l.firstName || '—'}</td><td>${l.lastName || '—'}</td><td>${l.email}</td><td>${l.phone || '—'}</td><td>${l.propertyAddress || '—'}</td><td style="color: #10B981; font-weight: 600;">${l.propertyPrice || '—'}</td><td>${l.propertyType || '—'}</td><td><button class="btn-danger btn-small" onclick="deleteLead(${l.id})">🗑️</button></td></tr>`).join('') : '<tr><td colspan="8" style="text-align: center; padding: 40px;">No leads</td></tr>';
             document.getElementById('leadsTable').innerHTML = html;
         }
 
         async function deleteLead(id) {
-            if (confirm('Delete this lead?')) {
+            if (confirm('Delete?')) {
                 await fetch(`${API}/leads/${id}`, { method: 'DELETE' });
                 loadLeads();
-                showMsg('addMsg', '✓ Lead deleted', 'success');
             }
         }
 
         function exportLeads() {
-            const csv = 'First Name,Last Name,Email,Phone,Property Address,Property Price,Property Type\n' +
-                leads.map(l => `"${l.firstName || ''}","${l.lastName || ''}","${l.email}","${l.phone || ''}","${l.propertyAddress || ''}","${l.propertyPrice || ''}","${l.propertyType || ''}"`).join('\n');
-            
+            const csv = 'First Name,Last Name,Email,Phone,Property Address,Property Price,Property Type\n' + leads.map(l => `"${l.firstName || ''}","${l.lastName || ''}","${l.email}","${l.phone || ''}","${l.propertyAddress || ''}","${l.propertyPrice || ''}","${l.propertyType || ''}"`).join('\n');
             const blob = new Blob([csv], { type: 'text/csv' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
             a.download = 'leads_' + new Date().toISOString().split('T')[0] + '.csv';
             a.click();
-            showMsg('addMsg', '✓ Leads exported!', 'success');
         }
 
         function clearAllLeads() {
-            if (confirm('🗑️ Delete ALL leads? This cannot be undone!')) {
+            if (confirm('🗑️ Delete ALL leads? Cannot undo!')) {
                 leads.forEach(l => fetch(`${API}/leads/${l.id}`, { method: 'DELETE' }));
                 leads = [];
                 renderLeads();
-                showMsg('addMsg', '✓ All leads cleared!', 'success');
+                showMsg('addMsg', '✓ All cleared!', 'success');
             }
         }
 
@@ -385,7 +415,7 @@
             const d = await r.json();
             if (d.success) {
                 document.getElementById('addForm').reset();
-                showMsg('addMsg', '✓ Lead added successfully!', 'success');
+                showMsg('addMsg', '✓ Added!', 'success');
                 loadLeads();
             } else {
                 showMsg('addMsg', '✗ ' + d.error, 'error');
@@ -395,22 +425,19 @@
         document.getElementById('fileInput')?.addEventListener('change', async (e) => {
             const f = e.target.files[0];
             if (!f) return;
-            
             document.getElementById('uploadLoading').style.display = 'block';
             try {
                 const fd = new FormData();
                 fd.append('file', f);
                 const r = await fetch(`${API}/leads/upload`, { method: 'POST', body: fd });
                 const d = await r.json();
-                
                 document.getElementById('addedCount').textContent = d.inserted || 0;
                 document.getElementById('failedCount').textContent = d.failed || 0;
                 document.getElementById('uploadStats').style.display = 'block';
-                
-                showMsg('uploadMsg', `✓ Upload complete! ${d.inserted} leads added, ${d.failed} skipped.`, d.inserted > 0 ? 'success' : 'warning');
+                showMsg('uploadMsg', `✓ ${d.inserted} added!`, d.inserted > 0 ? 'success' : 'warning');
                 loadLeads();
             } catch (err) {
-                showMsg('uploadMsg', '✗ Upload failed: ' + err.message, 'error');
+                showMsg('uploadMsg', '✗ Failed', 'error');
             } finally {
                 document.getElementById('uploadLoading').style.display = 'none';
             }
@@ -421,15 +448,8 @@
         async function loadTemplates() {
             const r = await fetch(`${API}/templates`);
             templates = await r.json();
-            
-            document.getElementById('templatesList').innerHTML = templates.length ? templates.map(t => `
-                <div style="padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 10px; cursor: pointer;" onclick="editTemplate(${t.id})" onmouseover="this.style.borderColor='#667eea'" onmouseout="this.style.borderColor='#e0e0e0'">
-                    <strong>${t.name}</strong><br><small>${t.subject.substring(0, 40)}...</small>
-                </div>
-            `).join('') : '<p style="text-align: center; color: #999;">No templates. Create one!</p>';
-            
-            document.getElementById('ctemplate').innerHTML = '<option>-- Select --</option>' + 
-                templates.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+            document.getElementById('templatesList').innerHTML = templates.map(t => `<div style="padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; margin-bottom: 10px; cursor: pointer;" onclick="editTemplate(${t.id})" onmouseover="this.style.borderColor='#667eea'" onmouseout="this.style.borderColor='#e0e0e0'"><strong>${t.name}</strong><br><small>${t.subject.substring(0, 40)}...</small></div>`).join('');
+            document.getElementById('ctemplate').innerHTML = '<option>Select...</option>' + templates.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
         }
 
         function createTemplate() {
@@ -442,23 +462,31 @@
         }
 
         function editTemplate(id) {
-            fetch(`${API}/templates/${id}`)
-                .then(r => r.json())
-                .then(t => {
-                    currentEditingTemplateId = id;
-                    document.getElementById('tname').value = t.name;
-                    document.getElementById('tsubject').value = t.subject;
-                    document.getElementById('tcontent').value = t.htmlContent;
-                    document.getElementById('templateEditor').style.display = 'block';
-                    document.getElementById('noEditor').style.display = 'none';
-                });
+            fetch(`${API}/templates/${id}`).then(r => r.json()).then(t => {
+                currentEditingTemplateId = id;
+                document.getElementById('tname').value = t.name;
+                document.getElementById('tsubject').value = t.subject;
+                document.getElementById('tcontent').value = t.htmlContent;
+                document.getElementById('templateEditor').style.display = 'block';
+                document.getElementById('noEditor').style.display = 'none';
+            });
         }
 
         function cancelEdit() {
             document.getElementById('templateEditor').style.display = 'none';
             document.getElementById('noEditor').style.display = 'block';
-            currentEditingTemplateId = null;
         }
+
+        function previewTemplate() {
+            const html = document.getElementById('tcontent').value;
+            if (!html) { showMsg('templateMsg', '⚠ Enter content', 'warning'); return; }
+            document.getElementById('previewBody').innerHTML = `<strong>Subject:</strong><div style="padding: 12px; background: #f8f9fa; border-radius: 6px; margin: 10px 0;">${document.getElementById('tsubject').value}</div><strong>Preview:</strong><div class="email-preview">${html}</div>`;
+            document.getElementById('emailPreviewModal').classList.add('active');
+        }
+
+        function closePreview() { document.getElementById('emailPreviewModal').classList.remove('active'); }
+
+        function printPreview() { window.print(); }
 
         document.getElementById('templateForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -474,7 +502,7 @@
             });
             const d = await r.json();
             if (d.success) {
-                showMsg('templateMsg', '✓ Template saved!', 'success');
+                showMsg('templateMsg', '✓ Saved!', 'success');
                 cancelEdit();
                 loadTemplates();
             } else {
@@ -482,16 +510,76 @@
             }
         });
 
+        async function loadCampaigns() {
+            const r = await fetch(`${API}/campaigns`);
+            const camps = await r.json();
+            document.getElementById('campaignHistory').innerHTML = camps.length ? camps.slice(0, 10).map(c => `<tr><td>${c.campaignName}</td><td>${c.sentCount || 0}</td><td>${c.failureCount || 0}</td><td><span class="badge badge-${c.status === 'completed' ? 'success' : 'error'}">${c.status}</span></td></tr>`).join('') : '<tr><td colspan="4">No campaigns</td></tr>';
+        }
+
+        function previewCampaign() {
+            const templateId = document.getElementById('ctemplate').value;
+            const template = templates.find(t => t.id == templateId);
+            if (!template) { showMsg('campaignMsg', '⚠ Select template', 'warning'); return; }
+            const recipientCount = leads.length;
+            document.getElementById('campaignPreviewBody').innerHTML = `<div class="info-box">Template: <strong>${template.name}</strong><br>Recipients: <strong>${recipientCount} leads</strong></div><div style="margin-top: 20px;"><strong>Subject:</strong><div style="padding: 12px; background: #f8f9fa; border-radius: 6px;">${template.subject}</div></div><div style="margin-top: 20px;"><strong>Email Preview:</strong><div class="email-preview">${template.htmlContent}</div></div>`;
+            document.getElementById('campaignPreviewModal').classList.add('active');
+        }
+
+        function closeCampaignPreview() { document.getElementById('campaignPreviewModal').classList.remove('active'); }
+
+        function confirmSendCampaign() { document.getElementById('campaignForm').dispatchEvent(new Event('submit')); closeCampaignPreview(); }
+
         document.getElementById('campaignForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
-            document.getElementById('campaignLoading').style.display = 'block';
+            const templateId = document.getElementById('ctemplate').value;
+            if (!templateId) { showMsg('campaignMsg', '⚠ Select template', 'warning'); return; }
             
-            setTimeout(() => {
+            document.getElementById('campaignLoading').style.display = 'block';
+            try {
+                const leadIds = leads.map(l => l.id);
+                const r = await fetch(`${API}/campaigns/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        templateId: parseInt(templateId),
+                        leadIds,
+                        campaignName: document.getElementById('cname').value,
+                        zoomLink: document.getElementById('czoom').value,
+                        meetingDate: document.getElementById('cdate').value,
+                        meetingTime: document.getElementById('ctime').value
+                    })
+                });
+                const d = await r.json();
+                if (d.success) {
+                    showMsg('campaignMsg', `✓ Campaign sent! ${d.sentCount} delivered, ${d.failureCount} failed.`, 'success');
+                    document.getElementById('campaignForm').reset();
+                    loadCampaigns();
+                    setTimeout(loadLogs, 1000);
+                } else {
+                    showMsg('campaignMsg', '✗ ' + d.error, 'error');
+                }
+            } catch (err) {
+                showMsg('campaignMsg', '✗ ' + err.message, 'error');
+            } finally {
                 document.getElementById('campaignLoading').style.display = 'none';
-                showMsg('campaignMsg', '✓ Campaign sent successfully!', 'success');
-                document.getElementById('campaignForm').reset();
-            }, 1500);
+            }
         });
+
+        async function loadLogs() {
+            const r = await fetch(`${API}/campaigns`);
+            const camps = await r.json();
+            let html = '';
+            for (const camp of camps) {
+                html += `<div style="margin-bottom: 20px; padding: 15px; border: 2px solid #e0e0e0; border-radius: 8px;"><strong>📧 ${camp.campaignName}</strong> - <span class="badge badge-${camp.status === 'completed' ? 'success' : 'error'}">${camp.status}</span><br><small>${new Date(camp.createdAt).toLocaleString()}</small><br>✓ ${camp.sentCount || 0} sent | ✗ ${camp.failureCount || 0} failed</div>`;
+            }
+            document.getElementById('logsList').innerHTML = html || '<div style="text-align: center; color: #999; padding: 40px;">No logs yet</div>';
+        }
+
+        function clearLogs() {
+            if (confirm('Clear logs?')) {
+                document.getElementById('logsList').innerHTML = '<div style="text-align: center; color: #999; padding: 40px;">Logs cleared</div>';
+            }
+        }
 
         async function loadSmtpSettings() {
             const r = await fetch(`${API}/smtp-settings`);
@@ -508,7 +596,6 @@
         document.getElementById('smtpForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
             document.getElementById('smtpLoading').style.display = 'block';
-            
             try {
                 await fetch(`${API}/smtp-settings`, {
                     method: 'POST',
@@ -524,9 +611,9 @@
                         companyPhone: document.getElementById('scphone').value
                     })
                 });
-                showMsg('smtpMsg', '✓ SMTP settings saved successfully!', 'success');
+                showMsg('smtpMsg', '✓ Saved!', 'success');
             } catch (err) {
-                showMsg('smtpMsg', '✗ Error saving settings', 'error');
+                showMsg('smtpMsg', '✗ Error', 'error');
             } finally {
                 document.getElementById('smtpLoading').style.display = 'none';
             }
@@ -536,53 +623,51 @@
             const host = document.getElementById('shost').value;
             const user = document.getElementById('suser').value;
             const pass = document.getElementById('spass').value;
-
-            if (!host || !user || !pass) {
-                showMsg('testMsg', '⚠️ Please fill in SMTP Host, Email, and Password', 'warning');
-                return;
-            }
-
+            if (!host || !user || !pass) { showMsg('testMsg', '⚠ Fill fields', 'warning'); return; }
+            
             const result = document.getElementById('testConnectionResult');
-            result.innerHTML = '<div class="loading"><div class="spinner"></div> Testing SMTP connection...</div>';
-            result.style.display = 'block';
-
+            result.innerHTML = '<div class="loading"><div class="spinner"></div> Testing...</div>';
             try {
-                // Simulate connection test
-                await new Promise(r => setTimeout(r, 2000));
-                result.innerHTML = '<div class="test-result success">✓ <strong>SMTP Connection Test Passed!</strong><br>Your settings appear valid. You can now send campaigns. Note: Actual email delivery depends on your provider configuration.</div>';
-                showMsg('testMsg', '✓ SMTP connection test passed!', 'success');
+                const r = await fetch(`${API}/smtp-test`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ smtpHost: host, smtpPort: parseInt(document.getElementById('sport').value), smtpSecure: document.getElementById('ssecure').value === 'true', emailUser: user, emailPassword: pass })
+                });
+                const d = await r.json();
+                if (d.success) {
+                    result.innerHTML = '<div style="padding: 12px; background: #D1FAE5; border-left: 4px solid #10B981; color: #065F46; border-radius: 6px;">✓ SMTP Connection Successful!</div>';
+                    showMsg('testMsg', '✓ Test passed!', 'success');
+                } else {
+                    result.innerHTML = '<div style="padding: 12px; background: #FEE2E2; border-left: 4px solid #ef4444; color: #991B1B; border-radius: 6px;">✗ Connection Failed: ' + d.error + '</div>';
+                    showMsg('testMsg', '✗ Failed', 'error');
+                }
             } catch (err) {
-                result.innerHTML = '<div class="test-result error">✗ <strong>SMTP Connection Failed.</strong><br>Please check your settings and try again.</div>';
-                showMsg('testMsg', '✗ Connection test failed', 'error');
+                result.innerHTML = '<div style="padding: 12px; background: #FEE2E2; border-left: 4px solid #ef4444; color: #991B1B; border-radius: 6px;">✗ Error: ' + err.message + '</div>';
             }
         }
 
         async function sendTestEmail() {
             const email = document.getElementById('testEmail').value;
-            if (!email) {
-                showMsg('testMsg', '⚠️ Please enter a test email address', 'warning');
-                return;
-            }
-
-            const host = document.getElementById('shost').value;
-            const user = document.getElementById('suser').value;
-
-            if (!host || !user) {
-                showMsg('testMsg', '⚠️ Please configure SMTP settings first', 'warning');
-                return;
-            }
-
+            if (!email) { showMsg('testMsg', '⚠ Enter email', 'warning'); return; }
+            
             const result = document.getElementById('testEmailResult');
-            result.innerHTML = '<div class="loading"><div class="spinner"></div> Sending test email to ' + email + '...</div>';
-            result.style.display = 'block';
-
+            result.innerHTML = '<div class="loading"><div class="spinner"></div> Sending...</div>';
             try {
-                await new Promise(r => setTimeout(r, 2500));
-                result.innerHTML = `<div class="test-result success">✓ <strong>Test email sent!</strong><br>Check your inbox at <strong>${email}</strong> to verify delivery.<br><br>⏱️ Delivery may take a few seconds to a few minutes.<br>💡 If not received, check spam folder or verify SMTP credentials.</div>`;
-                showMsg('testMsg', '✓ Test email sent to ' + email, 'success');
+                const r = await fetch(`${API}/smtp-test-email`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const d = await r.json();
+                if (d.success) {
+                    result.innerHTML = '<div style="padding: 12px; background: #D1FAE5; border-left: 4px solid #10B981; color: #065F46; border-radius: 6px;">✓ Test email sent to ' + email + '! Check inbox.</div>';
+                    showMsg('testMsg', '✓ Sent!', 'success');
+                } else {
+                    result.innerHTML = '<div style="padding: 12px; background: #FEE2E2; border-left: 4px solid #ef4444; color: #991B1B; border-radius: 6px;">✗ Failed: ' + d.error + '</div>';
+                    showMsg('testMsg', '✗ Failed', 'error');
+                }
             } catch (err) {
-                result.innerHTML = '<div class="test-result error">✗ <strong>Failed to send test email.</strong><br>Check your SMTP configuration and try again.</div>';
-                showMsg('testMsg', '✗ Failed to send test email', 'error');
+                result.innerHTML = '<div style="padding: 12px; background: #FEE2E2; border-left: 4px solid #ef4444; color: #991B1B; border-radius: 6px;">✗ Error: ' + err.message + '</div>';
             }
         }
 
