@@ -1,10 +1,10 @@
 {
   "name": "email-campaign-automation",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Professional email campaign automation system with template editor & SMTP config",
   "main": "server.js",
   "engines": {
-    "node": "18.x"
+    "node": "24.x"
   },
   "scripts": {
     "start": "node server.js",
