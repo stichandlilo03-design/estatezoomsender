@@ -18,42 +18,124 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb' }));
 app.use(express.static('public'));
 
-// Database
-const db = new sqlite3.Database(':memory:', (err) => {
-  if (err) console.error('DB Error:', err);
-  else console.log('✅ Database ready');
+// Database - Using file-based for Vercel
+const dbPath = process.env.SQLITE_PATH || './campaigns.db';
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) console.error('❌ DB Error:', err);
+  else console.log('✅ Database ready at', dbPath);
 });
 
 // Create tables
 db.serialize(() => {
+  // Leads table
   db.run(`CREATE TABLE IF NOT EXISTS leads (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    firstName TEXT, lastName TEXT, email TEXT UNIQUE, phone TEXT,
-    propertyAddress TEXT, propertyPrice TEXT, propertyType TEXT, createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    firstName TEXT,
+    lastName TEXT,
+    email TEXT UNIQUE,
+    phone TEXT,
+    propertyAddress TEXT,
+    propertyPrice TEXT,
+    propertyType TEXT,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
   
+  // Email templates table
   db.run(`CREATE TABLE IF NOT EXISTS emailTemplates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT, subject TEXT, htmlContent TEXT, createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    name TEXT,
+    subject TEXT,
+    htmlContent TEXT,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
   
+  // Campaigns table - TRACK SENDING
   db.run(`CREATE TABLE IF NOT EXISTS campaigns (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    leadId INTEGER, campaignName TEXT, emailSent BOOLEAN, sentAt DATETIME, createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-  
-  db.run(`CREATE TABLE IF NOT EXISTS smtpSettings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    smtpHost TEXT, smtpPort INTEGER, smtpSecure BOOLEAN, emailUser TEXT, emailPassword TEXT,
-    companyName TEXT, companyEmail TEXT, companyPhone TEXT
+    campaignName TEXT,
+    templateId INTEGER,
+    leadCount INTEGER,
+    sentCount INTEGER DEFAULT 0,
+    failureCount INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'pending',
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    startedAt DATETIME,
+    completedAt DATETIME
   )`);
 
-  // Insert default template
-  const defaultTemplate = `<html><body style="font-family: Arial; background: #f4f4f4;"><table width="100%"><tr><td align="center" style="padding: 20px;"><table width="600" style="background: white; border-radius: 8px;"><tr><td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; text-align: center; border-radius: 8px 8px 0 0;"><h1>Great News!</h1></td></tr><tr><td style="padding: 40px;"><p>Hi {{firstName}},</p><p>We have exciting news about your property at {{propertyAddress}}!</p><p>Let's schedule a Zoom meeting to discuss:</p><p><a href="{{zoomLink}}" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block;">Join Zoom Meeting</a></p><p><strong>Date:</strong> {{meetingDate}}<br><strong>Time:</strong> {{meetingTime}}</p><p>Best regards,<br>{{companyName}}<br>{{companyPhone}}</p></td></tr></table></td></tr></table></body></html>`;
+  // Campaign logs - DETAILED TRACKING
+  db.run(`CREATE TABLE IF NOT EXISTS campaignLogs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campaignId INTEGER,
+    leadId INTEGER,
+    leadEmail TEXT,
+    status TEXT,
+    message TEXT,
+    sentAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
   
-  db.run(`INSERT OR IGNORE INTO emailTemplates (id, name, subject, htmlContent) VALUES (1, 'Default', 'Property Update: {{propertyAddress}}', ?)`, [defaultTemplate]);
+  // SMTP settings table
+  db.run(`CREATE TABLE IF NOT EXISTS smtpSettings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    smtpHost TEXT,
+    smtpPort INTEGER,
+    smtpSecure BOOLEAN,
+    emailUser TEXT,
+    emailPassword TEXT,
+    companyName TEXT,
+    companyEmail TEXT,
+    companyPhone TEXT
+  )`);
+
+  // Insert default template if not exists
+  const defaultTemplate = `<html><body style="font-family: Arial; background: #f4f4f4;"><table width="100%"><tr><td align="center" style="padding: 20px;"><table width="600" style="background: white; border-radius: 8px;"><tr><td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; text-align: center; border-radius: 8px 8px 0 0;"><h1>Great News!</h1></td></tr><tr><td style="padding: 40px;"><p>Hi {{firstName}},</p><p>We have exciting news about your property at {{propertyAddress}}!</p><p>Valued at: {{propertyPrice}}</p><p>Type: {{propertyType}}</p><p>Let's schedule a meeting to discuss this amazing opportunity!</p><p><strong>Date:</strong> {{meetingDate}}<br><strong>Time:</strong> {{meetingTime}}</p><p><a href="{{zoomLink}}" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block;">Join Zoom Meeting</a></p><p>Best regards,<br>{{companyName}}<br>{{companyPhone}}</p></td></tr></table></td></tr></table></body></html>`;
+  
+  db.run(`INSERT OR IGNORE INTO emailTemplates (id, name, subject, htmlContent) VALUES (1, 'Default Template', 'Property Update: {{propertyAddress}}', ?)`, [defaultTemplate]);
   db.run(`INSERT OR IGNORE INTO smtpSettings (id, smtpHost, smtpPort) VALUES (1, 'smtp.gmail.com', 587)`);
 });
+
+let emailTransporter = null;
+
+// ==================== HELPER FUNCTIONS ====================
+function getEmailTransporter() {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM smtpSettings WHERE id = 1', (err, settings) => {
+      if (err) return reject(err);
+      if (!settings || !settings.emailUser || !settings.emailPassword) {
+        return reject(new Error('SMTP settings not configured'));
+      }
+
+      const transporter = nodemailer.createTransport({
+        host: settings.smtpHost,
+        port: settings.smtpPort,
+        secure: settings.smtpSecure === 1 || settings.smtpSecure === true,
+        auth: {
+          user: settings.emailUser,
+          pass: settings.emailPassword
+        }
+      });
+
+      resolve({ transporter, settings });
+    });
+  });
+}
+
+function replaceVariables(template, data) {
+  let content = template;
+  content = content.replace(/{{firstName}}/g, data.firstName || '');
+  content = content.replace(/{{lastName}}/g, data.lastName || '');
+  content = content.replace(/{{email}}/g, data.email || '');
+  content = content.replace(/{{phone}}/g, data.phone || '');
+  content = content.replace(/{{propertyAddress}}/g, data.propertyAddress || '');
+  content = content.replace(/{{propertyPrice}}/g, data.propertyPrice || '');
+  content = content.replace(/{{propertyType}}/g, data.propertyType || '');
+  content = content.replace(/{{zoomLink}}/g, data.zoomLink || '');
+  content = content.replace(/{{meetingDate}}/g, data.meetingDate || '');
+  content = content.replace(/{{meetingTime}}/g, data.meetingTime || '');
+  content = content.replace(/{{companyName}}/g, data.companyName || '');
+  content = content.replace(/{{companyPhone}}/g, data.companyPhone || '');
+  return content;
+}
 
 // ==================== API ENDPOINTS ====================
 
@@ -69,12 +151,13 @@ app.post('/api/leads', (req, res) => {
   const { firstName, lastName, email, phone, propertyAddress, propertyPrice, propertyType } = req.body;
   if (!email) return res.status(400).json({ success: false, error: 'Email required' });
   
-  db.run(`INSERT INTO leads (firstName, lastName, email, phone, propertyAddress, propertyPrice, propertyType) 
-          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  db.run(
+    `INSERT INTO leads (firstName, lastName, email, phone, propertyAddress, propertyPrice, propertyType) 
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [firstName || '', lastName || '', email, phone || '', propertyAddress || '', propertyPrice || '', propertyType || ''],
     function(err) {
-      if (err) return res.status(400).json({ success: false, error: 'Email exists or invalid' });
-      res.json({ success: true, id: this.lastID, message: 'Lead added' });
+      if (err) return res.status(400).json({ success: false, error: 'Email already exists' });
+      res.json({ success: true, id: this.lastID });
     }
   );
 });
@@ -86,7 +169,7 @@ app.delete('/api/leads/:id', (req, res) => {
   });
 });
 
-// FILE UPLOAD - CRITICAL FIX
+// FILE UPLOAD - CSV/EXCEL
 app.post('/api/leads/upload', upload.single('file'), (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, inserted: 0, failed: 0, error: 'No file' });
@@ -95,7 +178,6 @@ app.post('/api/leads/upload', upload.single('file'), (req, res) => {
     const buffer = req.file.buffer;
     let rows = [];
 
-    // Parse file
     if (fileName.endsWith('.csv')) {
       const csv = buffer.toString('utf-8');
       rows = parse(csv, { columns: true, skip_empty_lines: true });
@@ -111,7 +193,6 @@ app.post('/api/leads/upload', upload.single('file'), (req, res) => {
       return res.status(400).json({ success: false, inserted: 0, failed: 0, error: 'No data' });
     }
 
-    // Column mapping
     const detectColumn = (name) => {
       const n = name.toLowerCase().trim();
       if (n.includes('first')) return 'firstName';
@@ -166,7 +247,7 @@ app.post('/api/leads/upload', upload.single('file'), (req, res) => {
     });
 
     function finishUpload() {
-      res.json({ success: true, inserted, failed, total: rows.length, message: `✓ Upload complete! ${inserted} added.` });
+      res.json({ success: true, inserted, failed, total: rows.length });
     }
 
   } catch (error) {
@@ -188,7 +269,7 @@ app.get('/api/templates/:id', (req, res) => {
   });
 });
 
-// POST Template
+// POST/UPDATE Template
 app.post('/api/templates', (req, res) => {
   const { id, name, subject, htmlContent } = req.body;
   if (!name || !subject || !htmlContent) return res.status(400).json({ success: false });
@@ -232,37 +313,193 @@ app.get('/api/smtp-settings', (req, res) => {
   });
 });
 
-// POST SMTP Settings
+// POST SMTP Settings & Test
 app.post('/api/smtp-settings', (req, res) => {
   const { smtpHost, smtpPort, smtpSecure, emailUser, emailPassword, companyName, companyEmail, companyPhone } = req.body;
   
-  db.run(`INSERT OR REPLACE INTO smtpSettings (id, smtpHost, smtpPort, smtpSecure, emailUser, emailPassword, companyName, companyEmail, companyPhone)
-          VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [smtpHost, smtpPort, smtpSecure, emailUser, emailPassword, companyName, companyEmail, companyPhone],
+  db.run(
+    `INSERT OR REPLACE INTO smtpSettings (id, smtpHost, smtpPort, smtpSecure, emailUser, emailPassword, companyName, companyEmail, companyPhone)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [smtpHost, smtpPort, smtpSecure ? 1 : 0, emailUser, emailPassword, companyName, companyEmail, companyPhone],
     function(err) {
-      res.json({ success: !err, message: 'Settings saved' });
+      res.json({ success: !err });
+    }
+  );
+});
+
+// TEST SMTP Connection
+app.post('/api/smtp-test', async (req, res) => {
+  try {
+    const { transporter } = await getEmailTransporter();
+    await transporter.verify();
+    res.json({ success: true, message: 'SMTP connection successful' });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// SEND TEST EMAIL
+app.post('/api/smtp-test-email', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, error: 'Email required' });
+
+    const { transporter, settings } = await getEmailTransporter();
+
+    await transporter.sendMail({
+      from: settings.emailUser,
+      to: email,
+      subject: 'Test Email from Campaign Manager',
+      html: `<h1>Success!</h1><p>This is a test email from your Email Campaign Manager.</p><p>If you received this, your SMTP settings are working correctly!</p>`
+    });
+
+    res.json({ success: true, message: 'Test email sent' });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// SEND CAMPAIGN - REAL EMAIL SENDING
+app.post('/api/campaigns/send', async (req, res) => {
+  try {
+    const { templateId, leadIds, campaignName, zoomLink, meetingDate, meetingTime } = req.body;
+
+    if (!templateId) return res.status(400).json({ success: false, error: 'Template required' });
+    if (!leadIds || leadIds.length === 0) return res.status(400).json({ success: false, error: 'No leads selected' });
+
+    // Get template
+    const template = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM emailTemplates WHERE id = ?', [templateId], (err, tmpl) => {
+        if (err) reject(err);
+        else resolve(tmpl);
+      });
+    });
+
+    if (!template) return res.status(400).json({ success: false, error: 'Template not found' });
+
+    // Get SMTP settings
+    const { transporter, settings } = await getEmailTransporter();
+
+    // Create campaign record
+    const campaignId = await new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO campaigns (campaignName, templateId, leadCount, status, startedAt) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [campaignName || 'Campaign', templateId, leadIds.length],
+        function(err) {
+          if (err) reject(err);
+          else resolve(this.lastID);
+        }
+      );
+    });
+
+    // Send emails
+    let sentCount = 0;
+    let failureCount = 0;
+
+    for (const leadId of leadIds) {
+      try {
+        const lead = await new Promise((resolve, reject) => {
+          db.get('SELECT * FROM leads WHERE id = ?', [leadId], (err, l) => {
+            if (err) reject(err);
+            else resolve(l);
+          });
+        });
+
+        if (!lead) continue;
+
+        // Replace variables
+        const subject = replaceVariables(template.subject, { ...lead, zoomLink, meetingDate, meetingTime, companyName: settings.companyName });
+        const html = replaceVariables(template.htmlContent, { ...lead, zoomLink, meetingDate, meetingTime, companyName: settings.companyName, companyPhone: settings.companyPhone });
+
+        // Send email
+        await transporter.sendMail({
+          from: settings.emailUser,
+          to: lead.email,
+          subject: subject,
+          html: html
+        });
+
+        sentCount++;
+
+        // Log success
+        await new Promise((resolve, reject) => {
+          db.run(
+            `INSERT INTO campaignLogs (campaignId, leadId, leadEmail, status, message) VALUES (?, ?, ?, ?, ?)`,
+            [campaignId, leadId, lead.email, 'success', 'Email sent successfully'],
+            (err) => {
+              if (err) reject(err);
+              else resolve();
+            }
+          );
+        });
+
+      } catch (emailErr) {
+        failureCount++;
+        
+        // Log failure
+        await new Promise((resolve, reject) => {
+          db.run(
+            `INSERT INTO campaignLogs (campaignId, leadId, leadEmail, status, message) VALUES (?, ?, ?, ?, ?)`,
+            [campaignId, '', '', 'failed', emailErr.message],
+            (err) => {
+              if (err) reject(err);
+              else resolve();
+            }
+          );
+        });
+      }
+    }
+
+    // Update campaign status
+    await new Promise((resolve, reject) => {
+      db.run(
+        `UPDATE campaigns SET sentCount = ?, failureCount = ?, status = 'completed', completedAt = CURRENT_TIMESTAMP WHERE id = ?`,
+        [sentCount, failureCount, campaignId],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
+
+    res.json({ success: true, campaignId, sentCount, failureCount, total: leadIds.length });
+
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET Campaign Log
+app.get('/api/campaigns/:id/logs', (req, res) => {
+  db.all(
+    'SELECT * FROM campaignLogs WHERE campaignId = ? ORDER BY sentAt DESC',
+    [req.params.id],
+    (err, logs) => {
+      res.json(logs || []);
+    }
+  );
+});
+
+// GET Campaigns
+app.get('/api/campaigns', (req, res) => {
+  db.all(
+    'SELECT * FROM campaigns ORDER BY createdAt DESC LIMIT 50',
+    (err, campaigns) => {
+      res.json(campaigns || []);
     }
   );
 });
 
 // GET Campaign Stats
 app.get('/api/campaigns/stats', (req, res) => {
-  db.get('SELECT COUNT(*) as total, SUM(CASE WHEN emailSent = 1 THEN 1 ELSE 0 END) as emailsSent FROM campaigns', (err, stats) => {
-    res.json({ total: 0, emailsSent: 0, emailsOpened: 0, emailsClicked: 0, ...stats });
+  db.all('SELECT SUM(sentCount) as totalSent, SUM(failureCount) as totalFailed, COUNT(*) as campaigns FROM campaigns', (err, stats) => {
+    const row = (stats && stats[0]) || {};
+    res.json({
+      totalSent: row.totalSent || 0,
+      totalFailed: row.totalFailed || 0,
+      campaigns: row.campaigns || 0
+    });
   });
-});
-
-// GET Campaigns
-app.get('/api/campaigns', (req, res) => {
-  db.all(`SELECT c.*, l.firstName, l.lastName, l.email FROM campaigns c 
-          LEFT JOIN leads l ON c.leadId = l.id ORDER BY c.createdAt DESC LIMIT 100`, (err, campaigns) => {
-    res.json(campaigns || []);
-  });
-});
-
-// POST Campaign
-app.post('/api/campaigns', (req, res) => {
-  res.json({ success: true, message: 'Campaign sent' });
 });
 
 // Start server
