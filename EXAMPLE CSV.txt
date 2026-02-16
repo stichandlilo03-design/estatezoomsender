@@ -1,4 +1,0 @@
-First Name,Last Name,Email,Phone,Property Address,Property Price,Property Type
-John,Smith,john@example.com,+1-704-555-0101,123 Main Street Charlotte NC 28202,$450000,Single Family Home
-Jane,Doe,jane@example.com,+1-704-555-0102,456 Oak Avenue Charlotte NC 28203,$550000,Condo
-Mike,Johnson,mike@example.com,+1-704-555-0103,789 Pine Road Charlotte NC 28204,$350000,Town House
