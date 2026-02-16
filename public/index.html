@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dual Sender v3.0 — Real Estate & Prayer Meetings</title>
+    <style>
+        :root{--pri:#667eea;--pri2:#5568d3;--pbg:#f0f2ff;--ok:#28a745;--err:#dc3545;--g1:#f8f9fa;--g2:#e9ecef;--g5:#6c757d;--g8:#343a40}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#312e81,#4f46e5,#7c3aed);min-height:100vh;padding:15px}
+        .ctn{max-width:1100px;margin:0 auto}
+        header{background:#fff;padding:22px;border-radius:12px;margin-bottom:18px;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+        h1{color:var(--g8);font-size:24px;margin-bottom:4px} h2{color:var(--g8);margin-bottom:14px;font-size:15px;border-bottom:2px solid var(--pri);padding-bottom:10px}
+        .sub{color:var(--g5);font-size:12px}
+        .tabs{display:flex;gap:6px;margin-top:14px;border-bottom:2px solid var(--g2);flex-wrap:wrap}
+        .tb{padding:10px 16px;background:0;border:0;cursor:pointer;border-bottom:3px solid transparent;font-weight:600;color:#999;font-size:13px;transition:.2s}
+        .tb:hover{color:var(--pri)} .tb.a{color:var(--pri);border-bottom-color:var(--pri)}
+        .tc{display:none;animation:fi .3s} .tc.a{display:block}
+        @keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+        .card{background:#fff;padding:20px;border-radius:10px;margin-bottom:15px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+        .grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+        @media(max-width:768px){.grid{grid-template-columns:1fr}}
+        .fg{margin-bottom:12px}
+        label{display:block;font-weight:600;color:var(--g8);margin-bottom:4px;font-size:13px}
+        input,textarea,select{width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;font-family:inherit;transition:.2s}
+        input:focus,textarea:focus,select:focus{outline:0;border-color:var(--pri);box-shadow:0 0 0 3px rgba(102,126,234,.15)}
+        textarea{min-height:100px;resize:vertical;font-family:'Courier New',monospace}
+        button{padding:10px 20px;background:var(--pri);color:#fff;border:0;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;transition:.2s}
+        button:hover{background:var(--pri2)} button:disabled{opacity:.6;cursor:not-allowed}
+        .bd{background:var(--err)} .bd:hover{background:#c82333}
+        .bg{background:var(--ok)} .bg:hover{background:#218838}
+        .bs{padding:6px 12px;font-size:12px}
+        table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+        th{background:var(--pri);color:#fff;padding:10px;text-align:left} td{padding:10px;border-bottom:1px solid #eee} tr:hover{background:var(--g1)}
+        .msg{padding:12px;border-radius:6px;margin-bottom:10px;display:none;font-size:13px;font-weight:500}
+        .msg-success{background:#d4edda;color:#155724;border:1px solid #c3e6cb;display:block}
+        .msg-error{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;display:block}
+        .msg-warning{background:#fff3cd;color:#856404;border:1px solid #ffeaa7;display:block}
+        .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:15px}
+        @media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}}
+        .stat{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:18px;border-radius:10px;text-align:center}
+        .stat b{font-size:28px;display:block} .stat small{font-size:12px;opacity:.9}
+        .ox{overflow-x:auto}
+        .to{padding:12px;margin-bottom:8px;border:2px solid #ddd;border-radius:8px;cursor:pointer;transition:.2s}
+        .to:hover{border-color:var(--pri);background:var(--pbg)} .to.sel{border-color:var(--pri);background:var(--pri);color:#fff}
+        .ts{background:var(--pbg);border:2px solid var(--pri);padding:15px;border-radius:8px;margin-bottom:15px}
+        .ts h3{color:var(--pri);margin-bottom:10px;font-size:14px}
+        .es{text-align:center;color:#999;padding:30px} .es span{font-size:40px;display:block;margin-bottom:8px}
+        .le{padding:10px 12px;margin-bottom:8px;border-radius:6px;font-size:13px;border-left:4px solid}
+        .le-s{background:#ecfdf5;border-color:var(--ok)} .le-e{background:#fef2f2;border-color:var(--err)}
+        .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+        .badge-s{background:#d4edda;color:#155724} .badge-e{background:#f8d7da;color:#721c24}
+        .ss{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600}
+        .ss-on{background:#d4edda;color:#155724} .ss-off{background:#f8d7da;color:#721c24}
+        .ss-dot{width:8px;height:8px;border-radius:50%} .ss-on .ss-dot{background:#28a745} .ss-off .ss-dot{background:#dc3545}
+        .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center}
+        .modal.active{display:flex}
+        .mc{background:#fff;border-radius:12px;padding:24px;max-width:650px;width:90%;max-height:80vh;overflow-y:auto}
+        .mh{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+        .mx{background:0;border:0;font-size:28px;cursor:pointer;color:#999;padding:0}
+        .fu{border:2px dashed var(--pri);padding:20px;text-align:center;cursor:pointer;border-radius:8px;background:var(--pbg)} .fu input{display:none}
+        .ti{display:flex;gap:8px;margin-bottom:12px;border-bottom:1px solid #ddd}
+        .tib{padding:8px 14px;background:0;border:0;cursor:pointer;border-bottom:2px solid transparent;color:#666;font-weight:600;font-size:13px}
+        .tib.a{color:var(--pri);border-bottom-color:var(--pri)}
+        .tic{display:none} .tic.a{display:block}
+        .ib{background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:#4338ca;line-height:1.6}
+        .hl{background:var(--pbg);border:2px solid var(--pri);padding:14px;border-radius:8px;margin-bottom:14px}
+        code{background:#e8edff;padding:1px 5px;border-radius:3px;font-size:12px}
+        .price{color:var(--ok);font-weight:700}
+    </style>
+</head>
+<body>
+<div class="ctn">
+    <header>
+        <h1>🔄 Dual Sender v3.0</h1>
+        <p class="sub">✓ Smart From field ✓ Smart lead detection ✓ Lead preview ✓ Property fields ✓ Real SMTP ✓ Persistent</p>
+        <div class="tabs" id="mainTabs">
+            <button class="tb a" data-tab="dashboard">📊 Dashboard</button>
+            <button class="tb" data-tab="leads">👥 Contacts</button>
+            <button class="tb" data-tab="templates">📝 Templates</button>
+            <button class="tb" data-tab="campaigns">🚀 Campaigns</button>
+            <button class="tb" data-tab="logs">📋 Logs</button>
+            <button class="tb" data-tab="smtp">⚙️ SMTP</button>
+        </div>
+    </header>
+
+    <div id="dashboard" class="tc a">
+        <div class="stats"><div class="stat"><b id="dC">0</b><small>Contacts</small></div><div class="stat"><b id="dT">0</b><small>Templates</small></div><div class="stat"><b id="dCa">0</b><small>Campaigns</small></div><div class="stat"><b id="dE">0</b><small>Emails Sent</small></div></div>
+        <div class="card"><h2>🎯 Quick Start</h2><p style="color:#666;line-height:1.7;font-size:14px">1️⃣ Configure <strong>SMTP</strong> — set host, credentials, sender name & from email<br>2️⃣ Add <strong>Contacts</strong> — paste emails, CSV with headers, or upload files<br>3️⃣ Pick template & <strong>Send Campaign</strong><br><br>All data saved automatically. Supports Real Estate & Prayer meetings.</p></div>
+        <div class="grid"><div class="card"><h2>🏘️ Real Estate</h2><p style="color:#666;font-size:14px">Property meetings with address, price, type, and Zoom link.</p></div><div class="card"><h2>⛪ Prayer Meetings</h2><p style="color:#666;font-size:14px">Prayer invitations with Scripture, prayer focus, meeting details.</p></div></div>
+    </div>
+
+    <div id="leads" class="tc">
+        <div class="grid">
+            <div class="card">
+                <h2>➕ Add Contact</h2><div id="addMsg" class="msg"></div>
+                <form id="addForm">
+                    <div class="fg"><label>First Name</label><input id="fn"></div>
+                    <div class="fg"><label>Last Name</label><input id="ln"></div>
+                    <div class="fg"><label>Email *</label><input type="email" id="em" required></div>
+                    <div class="fg"><label>Phone</label><input id="ph"></div>
+                    <div class="fg"><label>Address / Info</label><input id="ad" placeholder="Property or church info"></div>
+                    <div class="fg"><label>Price</label><input id="pr" placeholder="$450,000"></div>
+                    <div class="fg"><label>Type</label><input id="ty" placeholder="House, Condo, Member..."></div>
+                    <button type="submit" class="bg" style="width:100%">Add Contact</button>
+                </form>
+            </div>
+            <div class="card">
+                <h2>📤 Import Contacts</h2><div id="uploadMsg" class="msg"></div>
+                <div class="ti"><button class="tib a" data-imp="paste">Paste</button><button class="tib" data-imp="upload">Upload</button></div>
+                <div id="impPaste" class="tic a">
+                    <div class="fg"><label>Paste emails or CSV:</label>
+                    <textarea id="pasteArea" placeholder="One email per line:&#10;stevenkilan@gmail.com&#10;john.doe@yahoo.com&#10;&#10;Or CSV with headers:&#10;First Name,Last Name,Email,Phone,Address,Price,Type&#10;John,Smith,john@test.com,555-1234,123 Main,$450k,House"></textarea>
+                    <p style="font-size:11px;color:#888;margin-top:5px">💡 <strong>Smart detect:</strong> Auto-detects emails vs CSV. Names extracted from emails. CSV headers auto-mapped (email, name, phone, address, price, type). Duplicates skipped.</p>
+                    <button type="button" id="pasteBtn" class="bg" style="width:100%;margin-top:10px">Import</button></div>
+                </div>
+                <div id="impUpload" class="tic">
+                    <div class="fu" id="dropArea"><input type="file" id="fileIn" accept=".csv,.txt"><p style="color:var(--pri);font-weight:600">📁 Click to upload CSV or TXT</p><p style="font-size:11px;color:#888;margin-top:5px">Emails per line or CSV with headers</p></div>
+                </div>
+                <div id="impStats" style="display:none;margin-top:10px"><div style="padding:10px;background:#d4edda;border-radius:6px;margin-bottom:6px;color:#155724;font-size:13px">✓ Added: <b id="impOk">0</b></div><div style="padding:10px;background:#fff3cd;border-radius:6px;color:#856404;font-size:13px">⚠ Skipped: <b id="impFail">0</b></div></div>
+            </div>
+        </div>
+        <div class="card">
+            <h2>📋 All Contacts (<span id="lCnt">0</span>)</h2>
+            <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap"><input id="searchL" placeholder="Search..." style="max-width:250px"><button class="bs" id="expBtn">📥 Export</button><button class="bs bd" id="clrBtn">🗑️ Clear All</button></div>
+            <div class="ox"><table><thead><tr><th>First</th><th>Last</th><th>Email</th><th>Phone</th><th>Address</th><th>Price</th><th>Type</th><th></th><th></th></tr></thead><tbody id="lTbl"><tr><td colspan="9" class="es"><span>👥</span>No contacts</td></tr></tbody></table></div>
+        </div>
+    </div>
+
+    <div id="templates" class="tc">
+        <div class="grid">
+            <div class="card"><h2>📚 Templates</h2><button class="bg" id="newTpl" style="width:100%;margin-bottom:12px">+ New Template</button><div id="tList"></div></div>
+            <div class="card"><h2>✏️ Editor</h2><div id="tMsg" class="msg"></div>
+                <form id="tForm" style="display:none">
+                    <div class="fg"><label>Name *</label><input id="tN" required></div>
+                    <div class="fg"><label>Subject *</label><input id="tS" required placeholder="e.g. Join Us for {{prayerSection}}"></div>
+                    <div class="fg"><label>HTML *</label><textarea id="tH" required style="min-height:200px"></textarea>
+                    <p style="font-size:11px;color:#888;margin-top:4px">Variables: {{firstName}} {{lastName}} {{email}} {{phone}} {{address}} {{price}} {{type}} {{companyName}} {{companyPhone}} {{senderName}} {{fromEmail}} {{zoomLink}} {{meetingDate}} {{meetingTime}} {{prayerSection}}</p></div>
+                    <button type="submit" class="bg" style="width:100%;margin-bottom:6px">Save</button>
+                    <button type="button" id="tCancel" style="width:100%;background:#999">Cancel</button>
+                </form>
+                <div id="noTpl" style="text-align:center;color:#999;padding:30px">Select or create a template</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="campaigns" class="tc">
+        <div class="card">
+            <h2>🚀 Send Campaign</h2><div id="cMsg" class="msg"></div>
+            <div class="ts"><h3>Step 1: Type</h3>
+                <div class="to" data-ct="realestate"><strong>🏘️ Real Estate — Property Meeting</strong><p style="font-size:12px;margin-top:4px">Buyer interest meetings with property details</p></div>
+                <div class="to" data-ct="prayer"><strong>⛪ Church — Prayer Meeting Zoom</strong><p style="font-size:12px;margin-top:4px">Prayer invitations with Scripture</p></div>
+            </div>
+            <form id="cForm">
+                <h3 style="margin-bottom:12px;font-size:14px">Step 2: Details</h3>
+                <div class="fg"><label>Zoom Link *</label><input type="url" id="cZ" required placeholder="https://zoom.us/j/..."></div>
+                <div class="fg"><label>Meeting Date *</label><input id="cD" required placeholder="February 14, 2026"></div>
+                <div class="fg"><label>Meeting Time *</label><input id="cT" required placeholder="7:00 PM EST"></div>
+                <div id="reFields" style="display:none"><div class="fg"><label>Property Address (override)</label><input id="cPa"></div><div class="fg"><label>Property Type (override)</label><input id="cPt"></div><div class="fg"><label>Property Price (override)</label><input id="cPp"></div></div>
+                <div id="prFields" style="display:none"><div class="fg"><label>Prayer Section</label><input id="cPs" placeholder="Monday Evening Prayer"></div></div>
+                <h3 style="margin:16px 0 10px;font-size:14px">Step 3: Template</h3>
+                <div class="fg"><select id="cTpl"><option value="">— Select —</option></select></div>
+                <button type="submit" class="bg" style="width:100%">Send Campaign to All Contacts</button>
+            </form>
+        </div>
+        <div class="card"><h2>📊 Status</h2><p id="cStat" style="color:#666;font-size:14px">Ready</p><p id="cDet" style="color:#999;font-size:13px;margin-top:6px"></p></div>
+    </div>
+
+    <div id="logs" class="tc">
+        <div class="card"><h2>📋 Logs</h2><div style="margin-bottom:10px;display:flex;gap:6px"><button class="bs" id="refLog">🔄 Refresh</button><button class="bs bd" id="clrLog">🗑️ Clear</button></div><div id="logList" style="max-height:600px;overflow-y:auto"><div class="es"><span>📋</span>No logs</div></div></div>
+    </div>
+
+    <div id="smtp" class="tc">
+        <div class="grid">
+            <div class="card">
+                <h2>⚙️ SMTP Configuration</h2>
+                <div class="ib"><strong>Gmail:</strong> <code>smtp.gmail.com</code> port <code>465</code> SSL + <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#4f46e5;font-weight:600">App Password</a><br><strong>Outlook:</strong> <code>smtp-mail.outlook.com</code> port <code>587</code><br><strong>Yahoo:</strong> <code>smtp.mail.yahoo.com</code> port <code>465</code> SSL + App Password</div>
+                <div id="sMsg" class="msg"></div>
+                <form id="sForm">
+                    <div class="fg"><label>SMTP Host *</label><input id="sH" required placeholder="smtp.gmail.com"></div>
+                    <div class="fg"><label>Port *</label><select id="sP"><option value="25">25</option><option value="465">465 — SSL</option><option value="587" selected>587 — STARTTLS</option><option value="2525">2525</option></select></div>
+                    <div class="fg"><label>Auth Email *</label><input id="sU" required placeholder="you@gmail.com"></div>
+                    <div class="fg"><label>Password / App Password *</label><input type="password" id="sPw" required></div>
+                    <div class="hl">
+                        <label style="font-weight:bold;color:var(--pri);display:block;margin-bottom:10px">📧 Sender Identity (From Field)</label>
+                        <div class="fg"><label>Sender Name</label><input id="sSn" placeholder="John Smith or Prayer Team"></div>
+                        <div class="fg"><label>From Email</label><input type="email" id="sFe" placeholder="sender@company.com (optional)"></div>
+                        <p style="font-size:12px;color:#666">Recipients see: <strong>"Sender Name" &lt;From Email&gt;</strong></p>
+                    </div>
+                    <div class="fg"><label>Company / Organization</label><input id="sCo" placeholder="Your Church or Company"></div>
+                    <div class="fg"><label>Phone</label><input id="sPh" placeholder="+1-XXX-XXX-XXXX"></div>
+                    <button type="submit" class="bg" style="width:100%">💾 Save SMTP Settings</button>
+                </form>
+            </div>
+            <div class="card">
+                <h2>🧪 Test SMTP</h2>
+                <div id="ssWrap"><div class="ss ss-off"><div class="ss-dot"></div>Not configured</div></div>
+                <div style="margin:12px 0"><button id="testConn" class="bg" style="width:100%">🔌 Test Connection</button></div>
+                <div id="tRes" class="msg"></div>
+                <hr style="margin:14px 0;border:0;border-top:1px solid #eee">
+                <p style="color:var(--g5);font-size:13px;margin-bottom:10px">Send a real test email:</p>
+                <div class="fg"><label>Test Email</label><input type="email" id="tEm" placeholder="your@email.com"></div>
+                <button id="testSend" style="width:100%">📧 Send Test Email</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="prevMod" class="modal"><div class="mc"><div class="mh"><h2 id="prevTitle">Preview</h2><button class="mx" id="prevClose">&times;</button></div><div id="prevBody" style="border:1px solid #eee;border-radius:6px;padding:16px;max-height:60vh;overflow-y:auto"></div></div></div>
+
+<script>
+const SK='ds3_';let nId=1,tNId=5,leads=[],tpls=[],cLogs=[],cCount=0,smtp={host:'',port:587,user:'',pass:'',senderName:'',fromEmail:'',companyName:'',companyPhone:''},selType='',editId=null;
+
+const DTPL=[
+{id:1,name:'Real Estate — Property Meeting',subject:'Property Meeting: {{address}}',html:'<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px"><h2 style="color:#4f46e5">🏘️ Property Meeting Invitation</h2><p>Dear <strong>{{firstName}} {{lastName}}</strong>,</p><p>You are invited to a property meeting:</p><table style="width:100%;border-collapse:collapse;margin:16px 0"><tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Property</td><td style="padding:8px;border:1px solid #ddd">{{address}}</td></tr><tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Type</td><td style="padding:8px;border:1px solid #ddd">{{type}}</td></tr><tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Price</td><td style="padding:8px;border:1px solid #ddd">{{price}}</td></tr><tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Date</td><td style="padding:8px;border:1px solid #ddd">{{meetingDate}}</td></tr><tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold">Time</td><td style="padding:8px;border:1px solid #ddd">{{meetingTime}}</td></tr></table><p><a href="{{zoomLink}}" style="display:inline-block;padding:12px 24px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold">Join Zoom Meeting</a></p><p style="color:#666;margin-top:20px">Best regards,<br>{{senderName}}<br>{{companyName}}<br>{{companyPhone}}</p></div>'},
+{id:2,name:'Church — Prayer Meeting',subject:"You're Invited: {{prayerSection}} 🙏",html:'<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px"><h2 style="color:#7c3aed">⛪ Prayer Meeting</h2><p>Dear <strong>{{firstName}}</strong>,</p><p>Join us for <strong>{{prayerSection}}</strong>.</p><div style="background:#f5f3ff;padding:16px;border-radius:8px;margin:16px 0;border-left:4px solid #7c3aed"><p style="margin:0"><strong>📅</strong> {{meetingDate}}</p><p style="margin:6px 0 0"><strong>🕐</strong> {{meetingTime}}</p></div><p style="font-style:italic;color:#666">"For where two or three gather in my name, there am I with them." — Matthew 18:20</p><p><a href="{{zoomLink}}" style="display:inline-block;padding:12px 24px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold">Join Prayer Meeting</a></p><p style="color:#666;margin-top:20px">In His service,<br>{{senderName}}<br>{{companyName}} | {{companyPhone}}</p></div>'},
+{id:3,name:'Prayer — Premium Dove',subject:'You\'re Invited: {{prayerSection}} | {{companyName}}',html:'<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#fff"><div style="background:linear-gradient(135deg,#4c1d95,#7c3aed,#a78bfa);padding:40px 30px;text-align:center;border-radius:12px 12px 0 0"><div style="font-size:48px;margin-bottom:8px">🕊️</div><h1 style="color:#fff;margin:0;font-size:26px">Prayer Meeting Invitation</h1><p style="color:#e9d5ff;margin:8px 0 0;font-size:14px">{{companyName}}</p></div><div style="padding:32px 30px"><p style="font-size:16px;color:#1f2937;line-height:1.7;margin:0 0 20px">Dear <strong>{{firstName}}</strong>,</p><p style="font-size:15px;color:#374151;line-height:1.8;margin:0 0 24px">We joyfully invite you to <strong style="color:#7c3aed">{{prayerSection}}</strong>. Come as you are.</p><div style="background:#f5f3ff;border-left:4px solid #7c3aed;padding:20px 24px;margin:0 0 28px"><p style="font-style:italic;color:#4c1d95;font-size:15px;margin:0">&#8220;Do not be anxious about anything, but in every situation, by prayer and petition, present your requests to God.&#8221;</p><p style="color:#7c3aed;font-weight:700;margin:10px 0 0;font-size:13px">— Philippians 4:6–7</p></div><div style="background:#faf5ff;border:2px solid #e9d5ff;border-radius:12px;padding:24px;margin:0 0 28px"><table style="width:100%;border-collapse:collapse"><tr><td style="padding:10px;color:#6b21a8;font-weight:700;font-size:13px;width:80px">📅 Date</td><td style="padding:10px;color:#1f2937">{{meetingDate}}</td></tr><tr><td style="padding:10px;color:#6b21a8;font-weight:700;font-size:13px">🕐 Time</td><td style="padding:10px;color:#1f2937">{{meetingTime}}</td></tr><tr><td style="padding:10px;color:#6b21a8;font-weight:700;font-size:13px">📍 Where</td><td style="padding:10px;color:#1f2937">Online via Zoom</td></tr></table></div><div style="text-align:center;margin:0 0 28px"><a href="{{zoomLink}}" style="display:inline-block;padding:16px 40px;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;text-decoration:none;border-radius:50px;font-weight:700;font-size:16px">🙏 Join Meeting</a></div><p style="font-size:15px;color:#7c3aed;font-weight:700;margin:8px 0 0">{{senderName}}<br>{{companyName}} | {{companyPhone}}</p></div><div style="background:#4c1d95;padding:20px;text-align:center;border-radius:0 0 12px 12px"><p style="color:#c4b5fd;font-size:12px;margin:0">&#8220;For where two or three gather in my name, there am I with them.&#8221; — Matthew 18:20</p></div></div>'},
+{id:4,name:'Prayer — Elegant Grace (Anti-Spam)',subject:'{{prayerSection}} — You\'re Warmly Invited | {{companyName}}',html:'<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#fff;border:1px solid #e5e7eb"><div style="height:6px;background:linear-gradient(90deg,#5b21b6,#7c3aed,#a78bfa)"></div><div style="padding:30px 35px 20px;text-align:center;border-bottom:1px solid #f3f4f6"><p style="font-size:28px;margin:0 0 6px">&#9769;</p><h1 style="margin:0;font-size:22px;color:#1f2937">{{companyName}}</h1><p style="margin:6px 0 0;font-size:13px;color:#6b7280">A Community of Faith &amp; Fellowship</p></div><div style="padding:30px 35px"><p style="font-size:15px;color:#374151;line-height:1.8;margin:0 0 18px">Dear {{firstName}},</p><p style="font-size:15px;color:#374151;line-height:1.8;margin:0 0 18px">You are warmly invited to <strong style="color:#5b21b6">{{prayerSection}}</strong> as we come together in prayer, reflection, and encouragement.</p><p style="font-size:15px;color:#374151;line-height:1.8;margin:0 0 24px">Whether you carry a burden, a praise, or simply a desire to connect, you are welcome just as you are.</p><div style="background:#faf5ff;border-left:3px solid #7c3aed;padding:16px 20px;margin:0 0 24px"><p style="font-style:italic;font-size:14px;color:#4c1d95;line-height:1.7;margin:0">&#8220;Come to me, all you who are weary and burdened, and I will give you rest.&#8221;</p><p style="font-size:12px;color:#7c3aed;font-weight:700;margin:8px 0 0">— Matthew 11:28</p></div><table style="width:100%;border-collapse:collapse;margin:0 0 24px"><tr><td style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:13px;color:#6b21a8;font-weight:700;width:80px">Date</td><td style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:14px;color:#1f2937">{{meetingDate}}</td></tr><tr><td style="padding:12px;border:1px solid #e5e7eb;font-size:13px;color:#6b21a8;font-weight:700">Time</td><td style="padding:12px;border:1px solid #e5e7eb;font-size:14px;color:#1f2937">{{meetingTime}}</td></tr><tr><td style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:13px;color:#6b21a8;font-weight:700">Location</td><td style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:14px;color:#1f2937">Online via Zoom</td></tr></table><div style="text-align:center;margin:0 0 28px"><a href="{{zoomLink}}" style="display:inline-block;padding:14px 36px;background:#5b21b6;color:#fff;text-decoration:none;border-radius:6px;font-weight:700;font-size:15px;font-family:Arial,sans-serif">Join Prayer Meeting</a></div><p style="font-size:14px;color:#374151;line-height:1.8;margin:0 0 4px">Grace and peace,</p><table style="margin:18px 0 0;border-collapse:collapse"><tr><td style="border-left:3px solid #5b21b6;padding:0 0 0 14px"><p style="margin:0;font-size:15px;font-weight:700;color:#1f2937;font-family:Arial,sans-serif">{{senderName}}</p><p style="margin:3px 0 0;font-size:13px;color:#6b7280;font-family:Arial,sans-serif">{{companyName}} | {{companyPhone}}</p><p style="margin:3px 0 0;font-size:12px;color:#9ca3af;font-family:Arial,sans-serif">Reaching hearts through prayer and community</p></td></tr></table></div><div style="padding:18px 35px;background:#f9fafb;border-top:1px solid #e5e7eb;text-align:center"><p style="font-size:11px;color:#9ca3af;margin:0">You received this as a valued member of our prayer community.<br>Reply "unsubscribe" to opt out. | {{companyName}}</p></div></div>'}
+];
+
+function save(){try{localStorage.setItem(SK+'l',JSON.stringify(leads));localStorage.setItem(SK+'nId',nId);localStorage.setItem(SK+'t',JSON.stringify(tpls));localStorage.setItem(SK+'tNId',tNId);localStorage.setItem(SK+'lg',JSON.stringify(cLogs));localStorage.setItem(SK+'cc',cCount);localStorage.setItem(SK+'sm',JSON.stringify(smtp))}catch(e){}}
+function load(){try{let s;s=localStorage.getItem(SK+'l');if(s)leads=JSON.parse(s);s=localStorage.getItem(SK+'nId');if(s)nId=parseInt(s)||1;s=localStorage.getItem(SK+'tNId');if(s)tNId=parseInt(s)||5;s=localStorage.getItem(SK+'lg');if(s)cLogs=JSON.parse(s);s=localStorage.getItem(SK+'cc');if(s)cCount=parseInt(s)||0;s=localStorage.getItem(SK+'sm');if(s)smtp=JSON.parse(s);s=localStorage.getItem(SK+'t');if(s){var t=JSON.parse(s);if(t&&t.length)tpls=t}}catch(e){}}
+tpls=DTPL.slice();load();
+
+// SMART NAME EXTRACTION
+const CN=['james','john','robert','michael','david','william','richard','joseph','thomas','charles','christopher','daniel','matthew','anthony','mark','donald','steven','steve','paul','andrew','joshua','kenneth','kevin','brian','george','timothy','ronald','edward','jason','jeffrey','ryan','jacob','gary','nicholas','eric','jonathan','stephen','larry','justin','scott','brandon','benjamin','samuel','raymond','gregory','frank','alexander','patrick','jack','dennis','jerry','tyler','aaron','jose','adam','nathan','henry','peter','zachary','douglas','mary','patricia','jennifer','linda','barbara','elizabeth','susan','jessica','sarah','karen','lisa','nancy','betty','margaret','sandra','ashley','dorothy','kimberly','emily','donna','michelle','carol','amanda','melissa','deborah','stephanie','rebecca','sharon','laura','cynthia','kathleen','amy','angela','shirley','anna','brenda','pamela','emma','nicole','helen','samantha','katherine','christine','debra','rachel','carolyn','janet','catherine','maria','heather','diane','ruth','julie','olivia','joyce','virginia','victoria','kelly','lauren','christina','joan','evelyn','judith','megan','andrea','cheryl','hannah','jacqueline','martha','gloria','teresa','ann','sara','madison','frances','kathryn','janice','jean','abigail','alice','grace','rosa','philip','roger','ralph','roy','eugene','randy','wayne','alan','carl','albert','arthur','lawrence','jesse','dylan','bryan','joe','jordan','billy','bruce','willie','gabriel','logan','allan','luke','don','elijah','isaac'];
+function extN(e){if(!e||!e.includes('@'))return{f:'',l:''};let lo=e.split('@')[0].toLowerCase().replace(/\d+$/,'').replace(/^\d+/,'');if(!lo)lo=e.split('@')[0];let p=[];if(/[._\-]/.test(lo))p=lo.split(/[._\-]+/).filter(x=>x);else{const c=lo.replace(/([a-z])([A-Z])/g,'$1 $2').split(' ');if(c.length>1)p=c;else{let found=false;for(const n of CN){if(lo.startsWith(n)&&lo.length>n.length&&(lo.length-n.length)>=2){p=[n,lo.slice(n.length)];found=true;break}}if(!found)p=[lo]}}p=p.filter(x=>x.replace(/\d/g,'').length>0);const cap=s=>{s=s.replace(/\d/g,'');return s?s[0].toUpperCase()+s.slice(1).toLowerCase():''};return p.length>=2?{f:cap(p[0]),l:cap(p.slice(1).join(' '))}:{f:cap(p[0]||''),l:''}}
+function isEm(s){return/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim())}
+
+// SMART CSV PARSER
+function smartCSV(text){const lines=text.trim().split('\n').map(x=>x.trim()).filter(x=>x);if(!lines.length)return{contacts:[],failed:0};const h=lines[0].toLowerCase();const hasH=h.includes('email')||h.includes('name')||h.includes('first')||h.includes('phone');const si=hasH?1:0;const cols=lines[0].split(',').map(x=>x.replace(/^"|"$/g,'').trim().toLowerCase());const m={email:-1,fn:-1,ln:-1,fullName:-1,phone:-1,addr:-1,price:-1,type:-1};if(hasH)cols.forEach((c,i)=>{if(c.includes('email'))m.email=i;else if(c.includes('first')||c==='fname')m.fn=i;else if(c.includes('last')||c==='lname'||c==='surname')m.ln=i;else if(c==='name'||c.includes('full name'))m.fullName=i;else if(c.includes('phone')||c.includes('mobile')||c.includes('cell'))m.phone=i;else if(c.includes('address')||c.includes('property')||c.includes('street')||c.includes('info'))m.addr=i;else if(c.includes('price')||c.includes('value')||c.includes('amount'))m.price=i;else if(c.includes('type')||c.includes('category'))m.type=i});const out=[];let fail=0;for(let i=si;i<lines.length;i++){const c=lines[i].split(',').map(x=>x.replace(/^"|"$/g,'').trim());let ei=m.email>=0?m.email:c.findIndex(x=>isEm(x));if(ei<0||!isEm(c[ei])){fail++;continue}let fn='',ln='';if(m.fullName>=0){const parts=(c[m.fullName]||'').split(/\s+/);fn=parts[0]||'';ln=parts.slice(1).join(' ')}else if(m.fn>=0){fn=c[m.fn]||'';ln=c[m.ln>=0?m.ln:'']||''}else if(!hasH&&ei>0){fn=c[0]||'';ln=ei>1?c[1]||'':''}if(!fn&&!ln){const n=extN(c[ei]);fn=n.f;ln=n.l}out.push({firstName:fn,lastName:ln,email:c[ei].toLowerCase(),phone:c[m.phone>=0?m.phone:'']||'',address:c[m.addr>=0?m.addr:'']||'',price:c[m.price>=0?m.price:'']||'',type:c[m.type>=0?m.type:'']||''})}return{contacts:out,failed:fail}}
+function parseEms(text){const l=text.trim().split('\n').map(x=>x.trim()).filter(x=>x);const out=[],fail=[];for(const x of l){if(isEm(x)){const n=extN(x);out.push({firstName:n.f,lastName:n.l,email:x.toLowerCase(),phone:'',address:'',price:'',type:''})}else fail.push(x)}return{contacts:out,failed:fail}}
+function isEPL(text){const l=text.trim().split('\n').map(x=>x.trim()).filter(x=>x);if(!l.length)return false;let c=0;for(const x of l)if(isEm(x))c++;return(c/l.length)>=.7}
+
+function showMsg(id,t,type){const e=document.getElementById(id);if(!e)return;e.textContent=t;e.className='msg msg-'+type;e.style.display='block';setTimeout(()=>e.style.display='none',6000)}
+function rv(s,v){return s.replace(/\{\{(\w+)\}\}/g,(_,k)=>v[k]||'')}
+async function apiP(ep,d){return(await fetch('/api/'+ep,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)})).json()}
+
+function addC(c){if(!c.email||!isEm(c.email))return false;if(leads.find(l=>l.email.toLowerCase()===c.email.toLowerCase()))return false;leads.push({id:nId++,firstName:c.firstName||'',lastName:c.lastName||'',email:c.email.toLowerCase(),phone:c.phone||'',address:c.address||'',price:c.price||'',type:c.type||'',createdAt:new Date().toISOString()});save();return true}
+function renderL(){const q=(document.getElementById('searchL')?.value||'').toLowerCase();const f=leads.filter(l=>(l.firstName+l.lastName+l.email+l.phone+l.address+l.price+l.type).toLowerCase().includes(q));document.getElementById('lCnt').textContent=leads.length;const t=document.getElementById('lTbl');if(!f.length){t.innerHTML='<tr><td colspan="9" class="es"><span>👥</span>No contacts</td></tr>';return}t.innerHTML=f.map(l=>'<tr><td>'+(l.firstName||'—')+'</td><td>'+(l.lastName||'—')+'</td><td>'+l.email+'</td><td>'+(l.phone||'—')+'</td><td>'+(l.address||'—')+'</td><td class="price">'+(l.price||'—')+'</td><td>'+(l.type||'—')+'</td><td><button class="bs" data-prev="'+l.id+'">👁️</button></td><td><button class="bs bd" data-del="'+l.id+'">🗑️</button></td></tr>').join('')}
+function renderT(){const e=document.getElementById('tList');if(!tpls.length){e.innerHTML='<div class="es"><span>📝</span>No templates</div>';return}e.innerHTML=tpls.map(t=>'<div style="padding:12px;border:1.5px solid #ddd;border-radius:8px;margin-bottom:8px;cursor:pointer;background:#fff" data-tid="'+t.id+'"><strong>'+t.name+'</strong><p style="font-size:12px;color:#888;margin-top:4px">'+t.subject.substring(0,70)+'</p><div style="margin-top:8px;display:flex;gap:6px"><button class="bs" data-prt="'+t.id+'">👁️</button><button class="bs" data-edt="'+t.id+'">✏️</button><button class="bs bd" data-dlt="'+t.id+'">🗑️</button></div></div>').join('');const s=document.getElementById('cTpl'),cur=s.value;s.innerHTML='<option value="">— Select —</option>'+tpls.map(t=>'<option value="'+t.id+'">'+t.name+'</option>').join('');s.value=cur}
+function renderLg(){const e=document.getElementById('logList');if(!cLogs.length){e.innerHTML='<div class="es"><span>📋</span>No logs</div>';return}e.innerHTML=[...cLogs].reverse().map(l=>'<div class="le '+(l.status==='success'?'le-s':'le-e')+'"><strong>'+l.name+'</strong> &lt;'+l.email+'&gt; <span class="badge '+(l.status==='success'?'badge-s':'badge-e')+'">'+l.status+'</span><br><small style="color:#888">'+l.subject+'</small><br><small style="color:'+(l.status==='success'?'#166534':'#991b1b')+'">'+(l.msg||'')+' — '+new Date(l.ts).toLocaleString()+'</small></div>').join('')}
+function fillS(){if(smtp.host)document.getElementById('sH').value=smtp.host;if(smtp.port)document.getElementById('sP').value=String(smtp.port);if(smtp.user)document.getElementById('sU').value=smtp.user;if(smtp.pass)document.getElementById('sPw').value=smtp.pass;if(smtp.senderName)document.getElementById('sSn').value=smtp.senderName;if(smtp.fromEmail)document.getElementById('sFe').value=smtp.fromEmail;if(smtp.companyName)document.getElementById('sCo').value=smtp.companyName;if(smtp.companyPhone)document.getElementById('sPh').value=smtp.companyPhone;if(smtp.host)document.getElementById('ssWrap').innerHTML='<div class="ss ss-on"><div class="ss-dot"></div>Saved: '+smtp.host+':'+smtp.port+'</div>'}
+function refreshD(){document.getElementById('dC').textContent=leads.length;document.getElementById('dT').textContent=tpls.length;document.getElementById('dCa').textContent=cCount;document.getElementById('dE').textContent=cLogs.length}
+
+document.addEventListener('DOMContentLoaded',()=>{
+document.getElementById('mainTabs').addEventListener('click',e=>{const b=e.target.closest('.tb');if(!b)return;document.querySelectorAll('.tb').forEach(x=>x.classList.remove('a'));document.querySelectorAll('.tc').forEach(x=>x.classList.remove('a'));b.classList.add('a');document.getElementById(b.dataset.tab).classList.add('a');refreshD()});
+document.querySelectorAll('.tib[data-imp]').forEach(b=>{b.addEventListener('click',()=>{document.querySelectorAll('.tib[data-imp]').forEach(x=>x.classList.remove('a'));document.querySelectorAll('.tic').forEach(x=>x.classList.remove('a'));b.classList.add('a');document.getElementById('imp'+b.dataset.imp.charAt(0).toUpperCase()+b.dataset.imp.slice(1)).classList.add('a')})});
+document.getElementById('addForm').addEventListener('submit',e=>{e.preventDefault();const ok=addC({firstName:document.getElementById('fn').value,lastName:document.getElementById('ln').value,email:document.getElementById('em').value,phone:document.getElementById('ph').value,address:document.getElementById('ad').value,price:document.getElementById('pr').value,type:document.getElementById('ty').value});if(ok){document.getElementById('addForm').reset();showMsg('addMsg','✓ Added!','success');renderL()}else showMsg('addMsg','✗ Invalid or duplicate','error')});
+document.getElementById('pasteBtn').addEventListener('click',()=>{const text=document.getElementById('pasteArea').value;if(!text.trim()){showMsg('uploadMsg','⚠ Paste data first','warning');return}let added=0,failed=0;if(isEPL(text)){const r=parseEms(text);r.contacts.forEach(c=>{if(addC(c))added++;else failed++});failed+=r.failed.length}else{const r=smartCSV(text);r.contacts.forEach(c=>{if(addC(c))added++;else failed++});failed+=r.failed}document.getElementById('impOk').textContent=added;document.getElementById('impFail').textContent=failed;document.getElementById('impStats').style.display='block';showMsg('uploadMsg','✓ '+added+' imported, '+failed+' skipped','success');document.getElementById('pasteArea').value='';renderL()});
+document.getElementById('dropArea').addEventListener('click',()=>document.getElementById('fileIn').click());
+document.getElementById('fileIn').addEventListener('change',e=>{const file=e.target.files[0];if(!file)return;const r=new FileReader();r.onload=ev=>{const text=ev.target.result;let added=0,failed=0;if(isEPL(text)){const r=parseEms(text);r.contacts.forEach(c=>{if(addC(c))added++;else failed++});failed+=r.failed.length}else{const r=smartCSV(text);r.contacts.forEach(c=>{if(addC(c))added++;else failed++});failed+=r.failed}document.getElementById('impOk').textContent=added;document.getElementById('impFail').textContent=failed;document.getElementById('impStats').style.display='block';showMsg('uploadMsg','✓ '+added+' imported','success');renderL()};r.readAsText(file)});
+document.getElementById('searchL').addEventListener('input',renderL);
+document.getElementById('expBtn').addEventListener('click',()=>{const csv='First,Last,Email,Phone,Address,Price,Type\n'+leads.map(l=>'"'+(l.firstName||'')+'","'+(l.lastName||'')+'","'+l.email+'","'+(l.phone||'')+'","'+(l.address||'')+'","'+(l.price||'')+'","'+(l.type||'')+'"').join('\n');const a=document.createElement('a');a.href='data:text/csv,'+encodeURIComponent(csv);a.download='contacts.csv';a.click()});
+document.getElementById('clrBtn').addEventListener('click',()=>{if(confirm('Delete ALL contacts?')){leads=[];nId=1;save();renderL()}});
+document.getElementById('lTbl').addEventListener('click',e=>{const del=e.target.closest('[data-del]');if(del){leads=leads.filter(l=>l.id!==parseInt(del.dataset.del));save();renderL();return}const prev=e.target.closest('[data-prev]');if(prev){const l=leads.find(x=>x.id===parseInt(prev.dataset.prev));if(l){document.getElementById('prevTitle').textContent='👁️ '+l.firstName+' '+l.lastName;document.getElementById('prevBody').innerHTML='<div style="line-height:2;font-size:14px"><p><strong>Name:</strong> '+l.firstName+' '+l.lastName+'</p><p><strong>Email:</strong> '+l.email+'</p><p><strong>Phone:</strong> '+(l.phone||'N/A')+'</p><p><strong>Address:</strong> '+(l.address||'N/A')+'</p><p><strong>Price:</strong> <span class="price">'+(l.price||'N/A')+'</span></p><p><strong>Type:</strong> '+(l.type||'N/A')+'</p><p><strong>Added:</strong> '+new Date(l.createdAt).toLocaleString()+'</p></div>';document.getElementById('prevMod').classList.add('active')}}});
+document.getElementById('newTpl').addEventListener('click',()=>{editId=null;document.getElementById('tN').value='';document.getElementById('tS').value='';document.getElementById('tH').value='';document.getElementById('tForm').style.display='block';document.getElementById('noTpl').style.display='none'});
+document.getElementById('tCancel').addEventListener('click',()=>{document.getElementById('tForm').style.display='none';document.getElementById('noTpl').style.display='block'});
+document.getElementById('tForm').addEventListener('submit',e=>{e.preventDefault();const name=document.getElementById('tN').value,subj=document.getElementById('tS').value,html=document.getElementById('tH').value;if(editId){const t=tpls.find(x=>x.id===editId);if(t){t.name=name;t.subject=subj;t.html=html}}else tpls.push({id:tNId++,name,subject:subj,html});save();showMsg('tMsg','✓ Saved!','success');document.getElementById('tForm').style.display='none';document.getElementById('noTpl').style.display='block';renderT()});
+document.getElementById('tList').addEventListener('click',e=>{const pr=e.target.closest('[data-prt]');if(pr){const t=tpls.find(x=>x.id===parseInt(pr.dataset.prt));if(t){document.getElementById('prevTitle').textContent=t.name;document.getElementById('prevBody').innerHTML=t.html;document.getElementById('prevMod').classList.add('active')}return}const ed=e.target.closest('[data-edt]');if(ed){const t=tpls.find(x=>x.id===parseInt(ed.dataset.edt));if(t){editId=t.id;document.getElementById('tN').value=t.name;document.getElementById('tS').value=t.subject;document.getElementById('tH').value=t.html;document.getElementById('tForm').style.display='block';document.getElementById('noTpl').style.display='none'}return}const dl=e.target.closest('[data-dlt]');if(dl&&confirm('Delete?')){tpls=tpls.filter(t=>t.id!==parseInt(dl.dataset.dlt));save();renderT()}});
+document.querySelectorAll('.to[data-ct]').forEach(o=>{o.addEventListener('click',()=>{document.querySelectorAll('.to[data-ct]').forEach(x=>x.classList.remove('sel'));o.classList.add('sel');selType=o.dataset.ct;document.getElementById('reFields').style.display=selType==='realestate'?'block':'none';document.getElementById('prFields').style.display=selType==='prayer'?'block':'none'})});
+document.getElementById('cForm').addEventListener('submit',async e=>{e.preventDefault();if(!selType){showMsg('cMsg','⚠ Select type','warning');return}const tplId=document.getElementById('cTpl').value;if(!tplId){showMsg('cMsg','⚠ Select template','warning');return}if(!leads.length){showMsg('cMsg','⚠ No contacts','warning');return}if(!smtp.host||!smtp.user||!smtp.pass){showMsg('cMsg','✗ Configure SMTP first','error');return}const tpl=tpls.find(t=>t.id===parseInt(tplId));if(!tpl)return;const vars={zoomLink:document.getElementById('cZ').value,meetingDate:document.getElementById('cD').value,meetingTime:document.getElementById('cT').value,prayerSection:document.getElementById('cPs')?.value||''};const oA=document.getElementById('cPa')?.value||'',oT=document.getElementById('cPt')?.value||'',oP=document.getElementById('cPp')?.value||'';const btn=document.querySelector('#cForm button[type="submit"]');btn.disabled=true;btn.textContent='⏳ Sending...';let sent=0,failed=0;cCount++;for(let i=0;i<leads.length;i++){const l=leads[i];const v={...vars,firstName:l.firstName,lastName:l.lastName,email:l.email,phone:l.phone,address:oA||l.address,price:oP||l.price,type:oT||l.type,companyName:smtp.companyName,companyPhone:smtp.companyPhone,senderName:smtp.senderName||smtp.companyName,fromEmail:smtp.fromEmail||smtp.user};const subject=rv(tpl.subject,v),html=rv(tpl.html,v);document.getElementById('cStat').textContent='⏳ '+(i+1)+'/'+leads.length;document.getElementById('cDet').textContent=l.email;let ok=false,msg='';try{const r=await apiP('send-email',{smtp,to:l.email,subject,html});if(r.success){ok=true;msg='Delivered'}else msg=r.error||'Failed'}catch(err){msg=err.message||'Error'}cLogs.push({cid:cCount,name:(l.firstName+' '+l.lastName).trim()||l.email,email:l.email,subject,status:ok?'success':'failed',msg,ts:new Date().toISOString()});if(ok)sent++;else failed++;save();if(i<leads.length-1)await new Promise(r=>setTimeout(r,500))}btn.disabled=false;btn.textContent='Send Campaign to All Contacts';document.getElementById('cStat').textContent='✓ Done!';document.getElementById('cDet').textContent='Delivered: '+sent+' | Failed: '+failed+' | '+new Date().toLocaleString();showMsg('cMsg','✓ '+sent+' delivered, '+failed+' failed',failed===0?'success':'warning')});
+document.getElementById('refLog').addEventListener('click',renderLg);
+document.getElementById('clrLog').addEventListener('click',()=>{if(confirm('Clear?')){cLogs=[];save();renderLg()}});
+document.getElementById('sForm').addEventListener('submit',e=>{e.preventDefault();smtp={host:document.getElementById('sH').value,port:parseInt(document.getElementById('sP').value),user:document.getElementById('sU').value,pass:document.getElementById('sPw').value,senderName:document.getElementById('sSn').value,fromEmail:document.getElementById('sFe').value,companyName:document.getElementById('sCo').value,companyPhone:document.getElementById('sPh').value};save();showMsg('sMsg','✓ Saved!','success');document.getElementById('ssWrap').innerHTML='<div class="ss ss-on"><div class="ss-dot"></div>Saved: '+smtp.host+':'+smtp.port+'</div>'});
+document.getElementById('testConn').addEventListener('click',async()=>{if(!smtp.host){showMsg('tRes','✗ Save SMTP first','error');return}const b=document.getElementById('testConn');b.disabled=true;b.textContent='⏳...';showMsg('tRes','⏳ Connecting...','warning');try{const r=await apiP('smtp-test',smtp);if(r.success){showMsg('tRes','✓ '+r.message,'success');document.getElementById('ssWrap').innerHTML='<div class="ss ss-on"><div class="ss-dot"></div>Verified ✓</div>'}else{showMsg('tRes','✗ '+r.error,'error');document.getElementById('ssWrap').innerHTML='<div class="ss ss-off"><div class="ss-dot"></div>Failed</div>'}}catch(err){showMsg('tRes','✗ '+err.message,'error')}b.disabled=false;b.textContent='🔌 Test Connection'});
+document.getElementById('testSend').addEventListener('click',async()=>{const em=document.getElementById('tEm').value;if(!em){showMsg('tRes','⚠ Enter email','warning');return}if(!smtp.host){showMsg('tRes','✗ Save SMTP first','error');return}const b=document.getElementById('testSend');b.disabled=true;b.textContent='⏳...';try{const r=await apiP('smtp-test-email',{...smtp,testEmail:em});if(r.success)showMsg('tRes','✓ '+r.message,'success');else showMsg('tRes','✗ '+r.error,'error')}catch(err){showMsg('tRes','✗ '+err.message,'error')}b.disabled=false;b.textContent='📧 Send Test Email'});
+document.getElementById('prevClose').addEventListener('click',()=>document.getElementById('prevMod').classList.remove('active'));
+document.getElementById('prevMod').addEventListener('click',e=>{if(e.target===document.getElementById('prevMod'))document.getElementById('prevMod').classList.remove('active')});
+fillS();refreshD();renderT();renderL();renderLg()});
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "dual-sender",
+  "version": "1.0.0",
+  "description": "Dual Sender - Real Estate & Prayer Meeting Email Campaigns",
+  "dependencies": {
+    "nodemailer": "^6.9.8"
+  }
+}
